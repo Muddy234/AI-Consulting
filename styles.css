@@ -29,6 +29,7 @@
 
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: 100px; /* Keeps headings visible below the fixed nav */
 }
 
 body {
@@ -98,10 +99,14 @@ p {
 .btn-primary {
     background-color: var(--gold);
     color: var(--navy);
+    font-weight: 700;
+    border: 2px solid var(--gold);
 }
 
 .btn-primary:hover {
-    background-color: var(--gold-hover);
+    background-color: transparent;
+    color: var(--gold);
+    border-color: var(--gold);
     transform: translateY(-2px);
     box-shadow: var(--shadow);
 }
