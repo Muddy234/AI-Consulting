@@ -34,8 +34,9 @@ class Config:
     EDGE_PATH = os.getenv("EDGE_PATH", f"C:\\Users\\{USERNAME}\\AppData\\Local\\Microsoft\\Edge\\User Data")
     PROFILE_DIRECTORY = os.getenv("EDGE_PROFILE", "Default")
 
-    # API Keys (prefer environment variables)
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+    # API Keys (prefer environment variables, fallback to hardcoded for testing)
+    # ⚠️ Replace with your actual API key or set GOOGLE_API_KEY environment variable
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "YOUR_API_KEY_HERE")
 
     # Google Sheet (OPTIONAL)
     USE_SHEETS = os.getenv("USE_SHEETS", "false").lower() == "true"
