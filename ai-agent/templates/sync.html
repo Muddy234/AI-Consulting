@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Outlook Sync - AI Agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4"><i class="bi bi-arrow-repeat me-2"></i>Outlook Sync</h2>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Sync Status -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-activity me-2"></i>Sync Status
+            </div>
+            <div class="card-body">
+                {% if status.last_sync %}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary">Last Sync:</span>
+                            <span class="badge bg-success">{{ status.last_sync }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary">Total Syncs:</span>
+                            <span class="badge bg-primary">{{ status.sync_count }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-secondary">Errors:</span>
+                            <span class="badge {% if status.error_count > 0 %}bg-danger{% else %}bg-success{% endif %}">
+                                {{ status.error_count }}
+                            </span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-secondary">
+                        <i class="bi bi-clock fs-1 d-block mb-2"></i>
+                        <p>No sync has been run yet</p>
+                    </div>
+                {% endif %}
+
+                <!-- Recent Errors -->
+                {% if status.recent_errors %}
+                    <h6 class="text-danger mb-3">Recent Errors</h6>
+                    <div class="list-group">
+                        {% for error in status.recent_errors %}
+                            <div class="list-group-item bg-dark border-danger">
+                                <small class="text-danger">{{ error.phase }}</small>
+                                <p class="mb-0 small">{{ error.error }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sync Controls -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-gear me-2"></i>Sync Controls
+            </div>
+            <div class="card-body">
+                <p class="text-secondary mb-4">
+                    The Outlook Sync bot scans your flagged emails and synchronizes them
+                    with your calendar. Events created by the bot are prefixed with 🤖.
+                </p>
+
+                <div class="d-grid gap-3">
+                    <form action="{{ url_for('start_sync') }}" method="POST">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-play-circle me-2"></i>Run Single Sync
+                        </button>
+                    </form>
+
+                    <form action="{{ url_for('start_continuous_sync') }}" method="POST">
+                        <button type="submit" class="btn btn-success btn-lg w-100">
+                            <i class="bi bi-arrow-repeat me-2"></i>Start Continuous Sync
+                        </button>
+                    </form>
+                </div>
+
+                <div class="alert alert-info mt-4 mb-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Continuous mode</strong> runs every 15 minutes automatically.
+                </div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-question-circle me-2"></i>How It Works
+            </div>
+            <div class="card-body">
+                <ol class="mb-0">
+                    <li class="mb-2">
+                        <strong>Auditor Phase</strong>: Scans your Outlook flagged emails using Selenium
+                    </li>
+                    <li class="mb-2">
+                        <strong>Sheet Update</strong>: Updates Google Sheet with current flagged items
+                    </li>
+                    <li class="mb-2">
+                        <strong>Enforcer Phase</strong>: AI Agent syncs calendar with the sheet
+                    </li>
+                    <li>
+                        <strong>Safety</strong>: Only modifies events starting with 🤖
+                    </li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
