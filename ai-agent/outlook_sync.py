@@ -44,21 +44,18 @@ class Config:
     SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")
 
     # Outlook URLs - Multiple Inboxes
-    # Each inbox has a name and its flagged email folder URL
+    # Note: Direct flagged email URLs don't work - we use Filter > Flagged instead
     INBOXES = [
         {
             "name": "Main",
-            "flagged_url": "https://outlook.office.com/mail/flaggedemail",
             "inbox_url": "https://outlook.office.com/mail/0/?culture=en-us&country=us"
         },
         {
             "name": "Becky",
-            "flagged_url": "https://outlook.office.com/mail/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcwAAA%3D/flaggedemail",
             "inbox_url": "https://outlook.office.com/mail/0/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcwAAA%3D?culture=en-us&country=us"
         },
         {
             "name": "Tyler",
-            "flagged_url": "https://outlook.office.com/mail/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcxAAA%3D/flaggedemail",
             "inbox_url": "https://outlook.office.com/mail/0/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcxAAA%3D?culture=en-us&country=us"
         }
     ]
@@ -142,7 +139,7 @@ class OutlookStateSync:
 
         # Build the inbox list for the prompt
         inbox_list = "\n".join([
-            f"   {i+1}. {inbox['name']}: {inbox['flagged_url']}"
+            f"   {i+1}. {inbox['name']}: {inbox['inbox_url']}"
             for i, inbox in enumerate(Config.INBOXES)
         ])
 
@@ -159,27 +156,30 @@ You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN 
 I HAVE 3 EMAIL INBOXES TO CHECK FOR FLAGGED EMAILS:
 {inbox_list}
 
-HOW TO IDENTIFY FLAGGED EMAILS:
-- Flagged emails have a RED FLAG ICON (🚩) next to them
-- The flag appears on the right side of the email row in the list
-- ONLY process emails that have this flag icon visible
-- If an email does NOT have a flag icon, SKIP IT completely
-- Newsletters, automated emails, or regular emails should be IGNORED unless flagged
+HOW TO FILTER FOR FLAGGED EMAILS (IMPORTANT!):
+The direct flagged email URL does NOT work. You MUST use the Filter feature:
+1. Go to the inbox URL
+2. Look for the "Filter" button/dropdown in the toolbar (near search bar)
+3. Click "Filter" and select "Flagged" from the dropdown options
+4. This will show ONLY flagged emails in the list
+5. If no flagged emails exist, the list will be empty - move to next inbox
 
 STEP 1: CHECK EACH INBOX FOR FLAGGED EMAILS
-For each of the 3 inboxes above:
-  a. Navigate to that inbox's flagged URL
+For each of the 3 inboxes:
+  a. Navigate to that inbox's URL
   b. Wait for the page to load (2-3 seconds)
-  c. Look at the email list - ONLY note emails that have the flag icon (🚩)
-  d. If the folder shows "No items" or is empty, move to the next inbox
-  e. For each FLAGGED email visible, note:
+  c. Click "Filter" button in the toolbar
+  d. Select "Flagged" from the filter options
+  e. Wait for the filtered list to load
+  f. If the list shows "No items" or is empty, clear filter and move to next inbox
+  g. For each email in the filtered list, note:
      - Inbox name (Main/Becky/Tyler)
      - Sender name
      - Subject line
      - Preview text (if visible)
 
 STEP 2: PROCESS EACH FLAGGED EMAIL
-For each email you identified as flagged:
+For each email you found in the flagged filter:
   a. Click to open the email
   b. Read the full content carefully
   c. Identify:
@@ -212,11 +212,11 @@ STEP 5: CLEAN UP OLD EVENTS
 - DELETE those stale events
 
 IMPORTANT RULES:
-✅ ONLY process emails that have the flag icon (🚩) visible
+✅ ALWAYS use Filter > Flagged to find flagged emails (direct URL doesn't work)
+✅ ONLY process emails shown in the Flagged filter
 ✅ ONLY create/modify/delete calendar events starting with "🤖"
-❌ DO NOT process newsletters, automated emails, or unflagged items
+❌ DO NOT process emails without applying the Flagged filter first
 ❌ DO NOT touch other calendar events
-❌ DO NOT create events for emails without a flag
 
 FINAL REPORT:
 After completing all steps, provide:
@@ -224,7 +224,7 @@ After completing all steps, provide:
 - Calendar events created (list each with title)
 - Calendar events deleted (if any)
 
-Begin now by navigating to the first inbox's flagged folder.
+Begin now by navigating to the first inbox (Main).
 """
 
         result = {"status": "unknown", "changes": [], "error": None}
