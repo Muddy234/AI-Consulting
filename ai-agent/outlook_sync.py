@@ -54,9 +54,10 @@ class Config:
     RETRY_DELAY = 5
 
 
-# Set API key in environment
-if Config.GOOGLE_API_KEY:
+# Set API key in environment BEFORE any imports that might need it
+if Config.GOOGLE_API_KEY and Config.GOOGLE_API_KEY != "YOUR_API_KEY_HERE":
     os.environ["GOOGLE_API_KEY"] = Config.GOOGLE_API_KEY
+    os.environ["GEMINI_API_KEY"] = Config.GOOGLE_API_KEY  # Some libs use this
 
 
 # ================= MAIN CLASS =================
@@ -64,8 +65,12 @@ class OutlookStateSync:
     def __init__(self):
         logger.info("Initializing Outlook State Sync System...")
 
-        # Initialize LLM (browser_use native - not LangChain)
-        self.llm = ChatGoogle(model="gemini-2.0-flash")
+        # Ensure API key is set
+        if not Config.GOOGLE_API_KEY or Config.GOOGLE_API_KEY == "YOUR_API_KEY_HERE":
+            raise ValueError("GOOGLE_API_KEY not configured! Set it in Config or as environment variable.")
+
+        # Initialize LLM with explicit API key
+        self.llm = ChatGoogle(model="gemini-2.0-flash", api_key=Config.GOOGLE_API_KEY)
 
         # Optional: Google Sheets
         self.sheets_enabled = False
