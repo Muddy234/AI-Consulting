@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Task Management - AI Agent{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4"><i class="bi bi-list-task me-2"></i>Task Management</h2>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Add Task Form -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-plus-circle me-2"></i>Add New Task
+            </div>
+            <div class="card-body">
+                <!-- Tab Navigation -->
+                <ul class="nav nav-pills nav-fill mb-3" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#natural-tab">
+                            Natural
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#structured-tab">
+                            Structured
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#json-tab">
+                            JSON
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Natural Language Tab -->
+                    <div class="tab-pane fade show active" id="natural-tab">
+                        <form action="{{ url_for('add_task') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Describe your task</label>
+                                <textarea name="natural_input" class="form-control" rows="4"
+                                          placeholder="e.g., Send an email to john@company.com about the project deadline"></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus me-1"></i>Add Task
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Structured Tab -->
+                    <div class="tab-pane fade" id="structured-tab">
+                        <form action="{{ url_for('add_task') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Task Type</label>
+                                <select name="task_type" class="form-select" id="taskTypeSelect">
+                                    {% for tt in task_types %}
+                                    <option value="{{ tt }}">{{ tt.replace('_', ' ').title() }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Priority</label>
+                                <select name="priority" class="form-select">
+                                    <option value="1">Normal (1)</option>
+                                    <option value="2">High (2)</option>
+                                    <option value="3">Urgent (3)</option>
+                                </select>
+                            </div>
+
+                            <!-- Dynamic Parameters -->
+                            <div id="parameterFields">
+                                <div class="mb-3">
+                                    <label class="form-label">Prompt / Instructions</label>
+                                    <textarea name="prompt" class="form-control" rows="3"
+                                              placeholder="Detailed instructions for the AI agent"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Max Retries</label>
+                                <input type="number" name="max_retries" class="form-control" value="3" min="1" max="10">
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus me-1"></i>Add Task
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- JSON Tab -->
+                    <div class="tab-pane fade" id="json-tab">
+                        <form action="{{ url_for('add_task') }}" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">JSON Task Definition</label>
+                                <textarea name="json_input" class="form-control font-monospace" rows="10"
+                                          placeholder='{
+  "type": "email_send",
+  "params": {
+    "to": "user@example.com",
+    "subject": "Hello",
+    "body": "Message content"
+  },
+  "priority": 2
+}'></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus me-1"></i>Add Task(s)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Execution Controls -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-gear me-2"></i>Execution Controls
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <form action="{{ url_for('run_tasks') }}" method="POST">
+                        <button type="submit" class="btn btn-success w-100" {% if not queue %}disabled{% endif %}>
+                            <i class="bi bi-play-fill me-1"></i>Run All Tasks
+                        </button>
+                    </form>
+                    <form action="{{ url_for('run_next_task') }}" method="POST">
+                        <button type="submit" class="btn btn-primary w-100" {% if not queue %}disabled{% endif %}>
+                            <i class="bi bi-skip-forward-fill me-1"></i>Run Next Task
+                        </button>
+                    </form>
+                    <form action="{{ url_for('stop_tasks') }}" method="POST">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="bi bi-stop-fill me-1"></i>Stop Execution
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Queue & History -->
+    <div class="col-md-8">
+        <!-- Current Queue -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-hourglass-split me-2"></i>Task Queue ({{ queue|length }} pending)</span>
+            </div>
+            <div class="card-body">
+                {% if queue %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in queue %}
+                                <tr>
+                                    <td><code>{{ task.id[:8] }}...</code></td>
+                                    <td>
+                                        <span class="task-type-badge bg-primary bg-opacity-25 text-primary">
+                                            {{ task.task_type.value }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if task.priority >= 3 %}
+                                            <span class="badge bg-danger">{{ task.priority }} (Urgent)</span>
+                                        {% elif task.priority >= 2 %}
+                                            <span class="badge bg-warning text-dark">{{ task.priority }} (High)</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ task.priority }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-{{ task.status.value }}">{{ task.status.value }}</span>
+                                    </td>
+                                    <td>
+                                        <small>{{ task.created_at.strftime('%H:%M:%S') }}</small>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info"
+                                                onclick="showTaskDetails('{{ task.id }}')" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                        <form action="{{ url_for('remove_task', task_id=task.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 text-secondary">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <p class="mb-0">No tasks in queue. Add a task to get started!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Task History -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history me-2"></i>Task History ({{ history|length }} total)
+            </div>
+            <div class="card-body">
+                {% if history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Attempts</th>
+                                    <th>Completed</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in history|reverse %}
+                                <tr>
+                                    <td><code>{{ task.id[:8] }}...</code></td>
+                                    <td>
+                                        <span class="task-type-badge bg-secondary bg-opacity-25 text-secondary">
+                                            {{ task.type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if task.status == 'completed' %}
+                                            <span class="badge badge-completed">
+                                                <i class="bi bi-check-circle me-1"></i>Completed
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-failed">
+                                                <i class="bi bi-x-circle me-1"></i>Failed
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ task.attempts }}</td>
+                                    <td>
+                                        <small>{{ task.completed_at[:19] if task.completed_at else '-' }}</small>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-info"
+                                                onclick="showHistoryDetails({{ task|tojson|safe }})" title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-5 text-secondary">
+                        <i class="bi bi-clock-history fs-1 d-block mb-2"></i>
+                        <p class="mb-0">No completed tasks yet.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Details Modal -->
+<div class="modal fade" id="taskDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>Task Details</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="taskDetailsContent" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showTaskDetails(taskId) {
+        fetch(`/tasks/${taskId}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('taskDetailsContent').textContent = JSON.stringify(data, null, 2);
+                new bootstrap.Modal(document.getElementById('taskDetailsModal')).show();
+            });
+    }
+
+    function showHistoryDetails(task) {
+        document.getElementById('taskDetailsContent').textContent = JSON.stringify(task, null, 2);
+        new bootstrap.Modal(document.getElementById('taskDetailsModal')).show();
+    }
+
+    // Dynamic parameter fields based on task type
+    document.getElementById('taskTypeSelect')?.addEventListener('change', function() {
+        const type = this.value;
+        const container = document.getElementById('parameterFields');
+
+        // Clear existing fields
+        container.innerHTML = '';
+
+        // Add relevant fields based on type
+        const fields = {
+            'email_send': ['to', 'subject', 'body'],
+            'email_reply': ['sender', 'subject_contains', 'reply_body'],
+            'calendar_create': ['title', 'date', 'start_time', 'duration', 'location'],
+            'calendar_delete': ['event_title', 'event_date']
+        };
+
+        const typeFields = fields[type];
+        if (typeFields) {
+            typeFields.forEach(field => {
+                const div = document.createElement('div');
+                div.className = 'mb-3';
+                div.innerHTML = `
+                    <label class="form-label">${field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</label>
+                    <input type="text" name="param_${field}" class="form-control" placeholder="${field}">
+                `;
+                container.appendChild(div);
+            });
+        } else {
+            container.innerHTML = `
+                <div class="mb-3">
+                    <label class="form-label">Prompt / Instructions</label>
+                    <textarea name="prompt" class="form-control" rows="3" placeholder="Detailed instructions for the AI agent"></textarea>
+                </div>
+            `;
+        }
+    });
+</script>
+{% endblock %}

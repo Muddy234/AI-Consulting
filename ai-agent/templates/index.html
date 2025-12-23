@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AI Agent{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Stats Row -->
+    <div class="col-md-3">
+        <div class="stat-card">
+            <h2>{{ queue_status.queue_length }}</h2>
+            <p class="text-secondary mb-0">Tasks in Queue</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <h2>{{ queue_status.history_count }}</h2>
+            <p class="text-secondary mb-0">Tasks Completed</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <h2>
+                {% if queue_status.is_running %}
+                    <i class="bi bi-play-circle-fill text-success"></i>
+                {% else %}
+                    <i class="bi bi-pause-circle-fill text-warning"></i>
+                {% endif %}
+            </h2>
+            <p class="text-secondary mb-0">
+                {{ "Running" if queue_status.is_running else "Idle" }}
+            </p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card">
+            <h2><i class="bi bi-robot"></i></h2>
+            <p class="text-secondary mb-0">AI Agent Active</p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-4 mt-4">
+    <div class="col-12">
+        <h4 class="mb-3"><i class="bi bi-lightning-charge me-2"></i>Quick Actions</h4>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('quick_email') }}" class="text-decoration-none">
+            <div class="card quick-action-card h-100">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-envelope"></i>
+                    <h5>Send Email</h5>
+                    <p class="text-secondary small mb-0">Compose and send an email</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('quick_calendar') }}" class="text-decoration-none">
+            <div class="card quick-action-card h-100">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-calendar-plus"></i>
+                    <h5>Create Event</h5>
+                    <p class="text-secondary small mb-0">Add to calendar</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('sync_page') }}" class="text-decoration-none">
+            <div class="card quick-action-card h-100">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <h5>Sync Now</h5>
+                    <p class="text-secondary small mb-0">Sync flagged emails</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3">
+        <a href="{{ url_for('tasks_page') }}" class="text-decoration-none">
+            <div class="card quick-action-card h-100">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-plus-circle"></i>
+                    <h5>Custom Task</h5>
+                    <p class="text-secondary small mb-0">Add any browser task</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Natural Language Input -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-chat-dots me-2"></i>Natural Language Command
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('add_task') }}" method="POST">
+                    <div class="input-group">
+                        <input type="text" name="natural_input" class="form-control form-control-lg"
+                               placeholder="Type a command... e.g., 'Send an email to john@example.com about the meeting tomorrow'">
+                        <button class="btn btn-primary btn-lg" type="submit">
+                            <i class="bi bi-send me-1"></i>Execute
+                        </button>
+                    </div>
+                    <small class="text-secondary mt-2 d-block">
+                        Examples: "Schedule a meeting for tomorrow at 2pm" | "Summarize my unread emails" | "Search for emails from John"
+                    </small>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Queue -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-list-task me-2"></i>Task Queue</span>
+                {% if queue_status.queue_length > 0 %}
+                <form action="{{ url_for('run_tasks') }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="bi bi-play-fill me-1"></i>Run All
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if queue_status.pending_tasks %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in queue_status.pending_tasks %}
+                                <tr>
+                                    <td>
+                                        <span class="task-type-badge bg-primary bg-opacity-25 text-primary">
+                                            {{ task.type }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.priority }}</td>
+                                    <td>
+                                        <span class="badge badge-{{ task.status }}">{{ task.status }}</span>
+                                    </td>
+                                    <td>
+                                        <form action="{{ url_for('remove_task', task_id=task.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-secondary">
+                        <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <p>No tasks in queue</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent History -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-clock-history me-2"></i>Recent Activity
+            </div>
+            <div class="card-body">
+                {% if history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Attempts</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in history|reverse %}
+                                <tr>
+                                    <td>
+                                        <span class="task-type-badge bg-secondary bg-opacity-25 text-secondary">
+                                            {{ task.type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if task.status == 'completed' %}
+                                            <span class="badge badge-completed">
+                                                <i class="bi bi-check-circle me-1"></i>Completed
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-failed">
+                                                <i class="bi bi-x-circle me-1"></i>Failed
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ task.attempts }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-secondary">
+                        <i class="bi bi-clock-history fs-1 d-block mb-2"></i>
+                        <p>No recent activity</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

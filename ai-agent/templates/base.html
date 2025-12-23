@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Agent Dashboard{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #1e1e2e;
+            --card-bg: #2a2a3e;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px 16px 0 0 !important;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            border: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            border: none;
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            color: #1e1e2e;
+        }
+
+        .form-control, .form-select {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            border-radius: 8px;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary-color);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .table {
+            color: var(--text-primary);
+        }
+
+        .table thead th {
+            background: rgba(99, 102, 241, 0.2);
+            border-bottom: 2px solid var(--primary-color);
+            font-weight: 600;
+        }
+
+        .table tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .badge-pending {
+            background-color: var(--warning-color);
+            color: #1e1e2e;
+        }
+
+        .badge-running {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            animation: pulse 1.5s infinite;
+        }
+
+        .badge-completed {
+            background-color: var(--success-color);
+        }
+
+        .badge-failed {
+            background-color: var(--danger-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .stat-card {
+            padding: 24px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .stat-card h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar {
+            background-color: var(--card-bg);
+            min-height: calc(100vh - 56px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-pills .nav-link {
+            color: var(--text-secondary);
+            border-radius: 8px;
+            margin: 4px 8px;
+            padding: 12px 16px;
+        }
+
+        .nav-pills .nav-link:hover {
+            background-color: rgba(99, 102, 241, 0.2);
+            color: var(--text-primary);
+        }
+
+        .nav-pills .nav-link.active {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+
+        .alert {
+            border-radius: 12px;
+            border: none;
+        }
+
+        .alert-success {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+        }
+
+        .alert-danger, .alert-error {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .alert-info {
+            background-color: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+        }
+
+        .task-type-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .quick-action-card {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .quick-action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+        }
+
+        .quick-action-card i {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="bi bi-robot me-2"></i>AI Agent Dashboard
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('tasks_page') }}">
+                            <i class="bi bi-list-task me-1"></i>Tasks
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('sync_page') }}">
+                            <i class="bi bi-arrow-repeat me-1"></i>Sync
+                        </a>
+                    </li>
+                </ul>
+                <div class="d-flex align-items-center">
+                    <span class="badge bg-light text-dark me-2" id="connection-status">
+                        <i class="bi bi-circle-fill text-warning me-1"></i>Connecting...
+                    </span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    <div class="container-fluid mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Content -->
+    <main class="container-fluid py-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="text-center py-3 text-secondary">
+        <small>AI Agent Dashboard &copy; 2024 | Powered by browser_use + Gemini</small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        // WebSocket connection
+        const socket = io();
+
+        socket.on('connect', function() {
+            document.getElementById('connection-status').innerHTML =
+                '<i class="bi bi-circle-fill text-success me-1"></i>Connected';
+        });
+
+        socket.on('disconnect', function() {
+            document.getElementById('connection-status').innerHTML =
+                '<i class="bi bi-circle-fill text-danger me-1"></i>Disconnected';
+        });
+
+        socket.on('task_started', function(data) {
+            console.log('Task started:', data);
+        });
+
+        socket.on('task_completed', function(data) {
+            console.log('Task completed:', data);
+            // Optionally refresh the page or update UI
+            location.reload();
+        });
+
+        socket.on('sync_completed', function(data) {
+            console.log('Sync completed:', data);
+            location.reload();
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
