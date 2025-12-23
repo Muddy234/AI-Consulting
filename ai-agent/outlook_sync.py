@@ -152,8 +152,12 @@ class OutlookStateSync:
             for i, inbox in enumerate(Config.INBOXES)
         ])
 
+        # Calculate tomorrow's date for the calendar event
+        from datetime import timedelta
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%A, %B %d, %Y")
+
         prompt = f"""
-MISSION: Find flagged emails in my Outlook inboxes and create calendar events for them.
+MISSION: Create a SINGLE consolidated "To-Do List" calendar event with ALL flagged emails.
 
 AUTHENTICATION: You are using my pre-authenticated Edge browser. I am ALREADY LOGGED IN.
 DO NOT attempt to log in or enter any credentials.
@@ -161,69 +165,74 @@ DO NOT attempt to log in or enter any credentials.
 INBOXES TO CHECK:
 {inbox_list}
 
-=== CRITICAL: HOW TO APPLY THE FLAGGED FILTER ===
-For EACH inbox, you MUST do these steps IN ORDER:
+=== PHASE 1: COLLECT FLAGGED EMAILS FROM ALL INBOXES ===
 
+For EACH inbox, do these steps IN ORDER:
 1. Navigate to the inbox URL
 2. Wait 3 seconds for page to load
 3. Click the "Filter" button (in toolbar near search)
-4. A dropdown menu will appear
-5. Click "Flagged" in that dropdown menu
-6. Wait 2 seconds for the filter to apply
-7. NOW the email list shows ONLY flagged emails
-8. If the list is empty, move to next inbox
+4. A dropdown menu will appear - click "Flagged" in that dropdown
+5. Wait 2 seconds for the filter to apply
+6. For each flagged email shown:
+   - Click on it to open and READ the full email content
+   - Note the sender name, subject, and understand what action is needed
+   - Go back to the filtered list and repeat for next email
+7. Move to next inbox
 
-⚠️ IMPORTANT: You must click BOTH "Filter" AND "Flagged" - clicking Filter alone does nothing!
-⚠️ DO NOT extract or process emails until AFTER you click "Flagged" in the dropdown!
+⚠️ You MUST click BOTH "Filter" AND "Flagged" - clicking Filter alone does nothing!
+⚠️ You MUST open and READ each email to understand the context!
 
-=== PHASE 1: COLLECT FLAGGED EMAILS FROM ALL INBOXES ===
-
-For MAIN inbox:
-1. Go to: {Config.INBOXES[0]['inbox_url']}
-2. Wait 3 seconds
-3. Click "Filter" button
-4. Click "Flagged" in the dropdown
-5. Wait 2 seconds
-6. Note all emails shown (these are flagged emails)
-
-For BECKY inbox:
-1. Go to: {Config.INBOXES[1]['inbox_url']}
-2. Wait 3 seconds
-3. Click "Filter" button
-4. Click "Flagged" in the dropdown
-5. Wait 2 seconds
-6. Note all emails shown (these are flagged emails)
-
-For TYLER inbox:
-1. Go to: {Config.INBOXES[2]['inbox_url']}
-2. Wait 3 seconds
-3. Click "Filter" button
-4. Click "Flagged" in the dropdown
-5. Wait 2 seconds
-6. Note all emails shown (these are flagged emails)
-
-=== PHASE 2: CREATE CALENDAR EVENTS ===
+=== PHASE 2: CREATE OR UPDATE THE TO-DO LIST CALENDAR EVENT ===
 
 Go to: {Config.CALENDAR_URL}
 
-For each flagged email you found:
-1. Click "New event"
-2. Title: "🤖 [Action] - [Topic]" (e.g., "🤖 Review - TR Dev Payments")
-3. Date/Time: Use deadline from email, or tomorrow 9:00 AM
-4. Duration: 30 minutes
-5. Description: Include sender, subject, and summary
-6. Save the event
+FIRST, check if a "🤖 {{To-Do List}}" event already exists:
+- Look for an event titled "🤖 {{To-Do List}}" on the calendar
+- If it exists, click on it and select "Edit" to update it
+- If it does NOT exist, click "New event" to create it
+
+The calendar event should be:
+- Title: "🤖 {{To-Do List}}"
+- Date: Tomorrow ({tomorrow})
+- Time: 7:00 AM
+- Duration: 30 minutes
+
+DESCRIPTION FORMAT (this is critical!):
+List each flagged email as a numbered item with this exact structure:
+
+1) [Sender Name] - [Subject Line]
+   - Summary: [2-3 sentences explaining what this email is about]
+   - Recommended Action: [What action should be taken based on the email]
+
+2) [Sender Name] - [Subject Line]
+   - Summary: [2-3 sentences explaining what this email is about]
+   - Recommended Action: [What action should be taken based on the email]
+
+...continue for all flagged emails...
+
+EXAMPLE DESCRIPTION:
+1) Jim Crigler - 48 and Vilas
+   - Summary: Email is surrounding a loan closing and is in regards to closing costs. There seems to be some issues that exist around how the loan proceeds will be handled at close.
+   - Recommended Action: Review attached closing costs summary. It seems the best way to approach this (AI chat recommendation)
+
+2) Rebecca Buchan - Affordable Housing
+   - Summary: Becky is requesting the last proforma for affordable housing projects.
+   - Recommended Action: Send the most recent affordable housing proforma to Becky.
 
 === RULES ===
-✅ Always click BOTH "Filter" AND "Flagged" before extracting emails
-✅ Only create calendar events starting with "🤖"
-❌ DO NOT process emails without applying the Flagged filter first
-❌ DO NOT touch other calendar events
+✅ Create only ONE calendar event containing ALL flagged emails
+✅ Title must be exactly "🤖 {{To-Do List}}"
+✅ Time must be tomorrow at 7:00 AM
+✅ If event exists, UPDATE it (don't create a duplicate)
+✅ READ each email fully to write good summaries and recommendations
+❌ DO NOT create separate events for each email
+❌ DO NOT use placeholder text like "[Action]" or "[Topic]"
 
 === FINAL REPORT ===
 When done, report:
-- Flagged emails found per inbox (Main: X, Becky: X, Tyler: X)
-- Calendar events created (list titles)
+- Total flagged emails found (Main: X, Becky: X, Tyler: X)
+- Whether you created a new event or updated an existing one
+- List of all items added to the To-Do List
 
 Begin now with the MAIN inbox.
 """
