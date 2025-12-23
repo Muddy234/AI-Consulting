@@ -33,6 +33,7 @@ class Config:
     USERNAME = os.getenv("OUTLOOK_USERNAME", "NateMcBride")
     EDGE_PATH = os.getenv("EDGE_PATH", f"C:\\Users\\{USERNAME}\\AppData\\Local\\Microsoft\\Edge\\User Data")
     PROFILE_DIRECTORY = os.getenv("EDGE_PROFILE", "Default")
+    EDGE_EXE_PATH = os.getenv("EDGE_EXE_PATH", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 
     # API Keys (prefer environment variables)
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAkxpLgxmubGXIrOC2daoMq-viXThIo62Y")
@@ -67,12 +68,16 @@ class OutlookStateSync:
         self.llm = ChatGoogle(model="gemini-2.0-flash")
 
         # Initialize browser profile to use existing Edge session (already logged into Outlook)
+        # IMPORTANT: Close all Edge windows before running to avoid user data directory conflicts
         self.browser_profile = BrowserProfile(
+            executable_path=Config.EDGE_EXE_PATH,
             user_data_dir=Config.EDGE_PATH,
+            profile_directory=Config.PROFILE_DIRECTORY,
             headless=False,
-            channel="msedge"  # Use Microsoft Edge
         )
         logger.info(f"   Using Edge profile: {Config.EDGE_PATH}")
+        logger.info(f"   Edge executable: {Config.EDGE_EXE_PATH}")
+        logger.info(f"   Profile directory: {Config.PROFILE_DIRECTORY}")
 
         # Optional: Google Sheets
         self.sheets_enabled = False
@@ -116,6 +121,10 @@ class OutlookStateSync:
 
         prompt = f"""
 MISSION: Intelligently sync my flagged Outlook emails to my calendar.
+
+IMPORTANT: You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
+DO NOT attempt to log in, enter credentials, or click any sign-in buttons.
+If you see a login page, wait a moment - you may need to refresh, or just navigate directly to the URL.
 
 STEP 1: Go to {Config.FLAGGED_FOLDER}
 - Look at all flagged emails in the list
@@ -209,6 +218,9 @@ Begin now.
         prompt = f"""
 TASK: Find and process a specific email, then create a calendar event.
 
+IMPORTANT: You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
+DO NOT attempt to log in, enter credentials, or click any sign-in buttons.
+
 STEP 1: Go to {Config.INBOX_URL}
 - Search for: {email_identifier}
 - Open the most relevant email
@@ -257,6 +269,9 @@ REPORT what you created.
 
         prompt = f"""
 TASK: Summarize my recent emails and identify action items.
+
+IMPORTANT: You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
+DO NOT attempt to log in, enter credentials, or click any sign-in buttons.
 
 STEP 1: Go to {Config.INBOX_URL}
 - Look at the {count} most recent unread emails (or all recent if fewer unread)
