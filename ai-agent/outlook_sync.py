@@ -91,15 +91,8 @@ class OutlookStateSync:
             user_data_dir=Config.EDGE_PATH,
             profile_directory=Config.PROFILE_DIRECTORY,
             headless=False,
-            # Allow Outlook and Microsoft domains
-            allowed_domains=[
-                "outlook.office.com",
-                "outlook.office365.com",
-                "login.microsoftonline.com",
-                "login.live.com",
-                "office.com",
-                "microsoft.com",
-            ],
+            # Don't restrict domains - this is a personal automation tool
+            # The edge://newtab/ page was being blocked, causing browser to close
         )
         logger.info(f"   Using Edge profile: {Config.EDGE_PATH}")
         logger.info(f"   Edge executable: {Config.EDGE_EXE_PATH}")
