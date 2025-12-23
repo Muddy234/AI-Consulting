@@ -1,28 +1,15 @@
 """
 Outlook State Sync - AI-Powered Email & Calendar Manager
 =========================================================
-Phase 1 (Auditor): Selenium scrapes flagged emails → Google Sheet
-Phase 2 (Enforcer): AI Agent syncs Sheet → Outlook Calendar
+Smart sync that reads flagged emails and creates contextual calendar events.
+Google Sheets integration is optional.
 """
 
 import os
-import time
-import hashlib
-import re
 import logging
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
-
-import gspread
-from google.oauth2 import service_account
-
-# Selenium imports
-from selenium import webdriver
-from selenium.webdriver.edge.options import Options as EdgeOptions
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # Browser-use imports (native - no LangChain wrapper needed)
 from browser_use import Agent
@@ -45,19 +32,20 @@ class Config:
     # User Settings
     USERNAME = os.getenv("OUTLOOK_USERNAME", "NateMcBride")
     EDGE_PATH = os.getenv("EDGE_PATH", f"C:\\Users\\{USERNAME}\\AppData\\Local\\Microsoft\\Edge\\User Data")
-    EDGE_EXE_PATH = os.getenv("EDGE_EXE_PATH", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
     PROFILE_DIRECTORY = os.getenv("EDGE_PROFILE", "Default")
 
     # API Keys (prefer environment variables)
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 
-    # Google Sheet URL
+    # Google Sheet (OPTIONAL)
+    USE_SHEETS = os.getenv("USE_SHEETS", "false").lower() == "true"
     SHEET_URL = os.getenv("SHEET_URL", "")
     SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")
 
     # Outlook URLs
     FLAGGED_FOLDER = "https://outlook.office.com/mail/flaggedemail"
     CALENDAR_URL = "https://outlook.office.com/calendar/view/week"
+    INBOX_URL = "https://outlook.office.com/mail/inbox"
 
     # Timing
     SYNC_INTERVAL_SECONDS = int(os.getenv("SYNC_INTERVAL", 900))  # 15 minutes
@@ -66,26 +54,8 @@ class Config:
 
 
 # Set API key in environment
-os.environ["GOOGLE_API_KEY"] = Config.GOOGLE_API_KEY
-
-
-# ================= TASK DATA CLASS =================
-class FlaggedTask:
-    def __init__(self, task_id: str, description: str, status: str = "Active"):
-        self.id = task_id
-        self.description = description
-        self.status = status
-        self.created_at = datetime.now()
-
-    def to_dict(self) -> Dict:
-        return {
-            "id": self.id,
-            "description": self.description,
-            "status": self.status
-        }
-
-    def to_row(self) -> List[str]:
-        return [self.id, self.description, self.status]
+if Config.GOOGLE_API_KEY:
+    os.environ["GOOGLE_API_KEY"] = Config.GOOGLE_API_KEY
 
 
 # ================= MAIN CLASS =================
@@ -96,8 +66,10 @@ class OutlookStateSync:
         # Initialize LLM (browser_use native - not LangChain)
         self.llm = ChatGoogle(model="gemini-2.0-flash")
 
-        # Initialize Google Sheets connection
-        self._init_sheets()
+        # Optional: Google Sheets
+        self.sheets_enabled = False
+        if Config.USE_SHEETS:
+            self._init_sheets()
 
         # State tracking
         self.last_sync = None
@@ -105,8 +77,11 @@ class OutlookStateSync:
         self.errors = []
 
     def _init_sheets(self):
-        """Initialize Google Sheets connection with error handling"""
+        """Initialize Google Sheets connection (optional)"""
         try:
+            import gspread
+            from google.oauth2 import service_account
+
             self.creds = service_account.Credentials.from_service_account_file(
                 Config.SERVICE_ACCOUNT_FILE,
                 scopes=['https://www.googleapis.com/auth/spreadsheets']
@@ -114,144 +89,65 @@ class OutlookStateSync:
             self.gc = gspread.authorize(self.creds)
             self.sh = self.gc.open_by_url(Config.SHEET_URL)
             self.worksheet = self.sh.sheet1
-            logger.info("✅ Connected to Google Sheet")
+            self.sheets_enabled = True
+            logger.info("✅ Connected to Google Sheet (optional)")
         except FileNotFoundError:
-            logger.error(f"Service account file not found: {Config.SERVICE_ACCOUNT_FILE}")
-            raise
+            logger.warning(f"⚠️ Service account file not found. Sheets disabled.")
         except Exception as e:
-            logger.error(f"Failed to connect to Google Sheets: {e}")
-            raise
+            logger.warning(f"⚠️ Could not connect to Sheets: {e}. Continuing without Sheets.")
 
-    # ================= PHASE 1: AUDITOR (Selenium) =================
-    def run_auditor(self) -> List[FlaggedTask]:
+    # ================= SMART EMAIL-TO-CALENDAR SYNC =================
+    async def run_smart_sync(self) -> Dict:
         """
-        Scans the Outlook 'Flagged' folder using Selenium.
-        Returns list of FlaggedTask objects.
+        AI-powered sync that:
+        1. Opens flagged emails folder
+        2. Reads each flagged email to understand context
+        3. Creates calendar events with meaningful details
         """
-        logger.info("🕵️ AUDITOR: Starting flagged email scan...")
-        tasks_found = []
-        driver = None
-
-        try:
-            # Configure Edge browser
-            options = EdgeOptions()
-            options.add_argument(f"user-data-dir={Config.EDGE_PATH}")
-            options.add_argument(f"--profile-directory={Config.PROFILE_DIRECTORY}")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
-            # options.add_argument("--headless")  # Uncomment for headless mode
-
-            driver = webdriver.Edge(options=options)
-            wait = WebDriverWait(driver, 15)
-
-            # Navigate to flagged folder
-            logger.info(f"   Navigating to: {Config.FLAGGED_FOLDER}")
-            driver.get(Config.FLAGGED_FOLDER)
-
-            # Wait for email list to load
-            wait.until(EC.presence_of_element_located((By.XPATH, "//div[@role='option']")))
-            time.sleep(3)  # Allow list to settle
-
-            # Scrape flagged items
-            email_items = driver.find_elements(By.XPATH, "//div[@role='option']")
-            logger.info(f"   Found {len(email_items)} flagged items")
-
-            for item in email_items:
-                try:
-                    raw_text = item.get_attribute("aria-label") or item.text
-                    clean_text = self._clean_text(raw_text)
-
-                    if clean_text:
-                        task_id = hashlib.md5(clean_text.encode()).hexdigest()[:10]
-                        tasks_found.append(FlaggedTask(task_id, clean_text))
-                except Exception as e:
-                    logger.debug(f"   Skipped item: {e}")
-                    continue
-
-            logger.info(f"   ✅ Auditor found {len(tasks_found)} valid tasks")
-
-        except Exception as e:
-            logger.error(f"   ❌ Auditor failed: {e}")
-            self.errors.append({"phase": "auditor", "error": str(e), "time": datetime.now()})
-        finally:
-            if driver:
-                driver.quit()
-                logger.info("   Browser closed")
-
-        # Update Google Sheet
-        self._update_sheet(tasks_found)
-        return tasks_found
-
-    def _clean_text(self, text: str) -> str:
-        """Clean email metadata from text"""
-        if not text:
-            return ""
-
-        # Remove common Outlook metadata
-        junk_patterns = [
-            r"Flagged,?", r"Unread,?", r"Read,?", r"Selected,?",
-            r"High importance,?", r"Low importance,?",
-            r"\d{1,2}:\d{2}\s*(AM|PM)?",  # Times
-            r"\d{1,2}/\d{1,2}/\d{2,4}",   # Dates
-        ]
-
-        for pattern in junk_patterns:
-            text = re.sub(pattern, "", text, flags=re.IGNORECASE)
-
-        return text.strip()[:100]  # Truncate to 100 chars
-
-    def _update_sheet(self, tasks: List[FlaggedTask]):
-        """Update Google Sheet with current tasks"""
-        logger.info("   📝 Updating Google Sheet...")
-
-        try:
-            self.worksheet.clear()
-
-            # Headers
-            headers = ["ID", "Task Description", "Status", "Last Updated"]
-            rows = [headers]
-
-            # Task rows
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-            for task in tasks:
-                rows.append([task.id, task.description, task.status, timestamp])
-
-            self.worksheet.update(values=rows, range_name='A1')
-            logger.info(f"   ✅ Sheet updated with {len(tasks)} tasks")
-
-        except Exception as e:
-            logger.error(f"   ❌ Failed to update sheet: {e}")
-            self.errors.append({"phase": "sheet_update", "error": str(e), "time": datetime.now()})
-
-    # ================= PHASE 2: ENFORCER (AI Agent) =================
-    async def run_enforcer(self, tasks: List[FlaggedTask]) -> Dict:
-        """
-        Uses AI Agent to sync tasks with Outlook Calendar.
-        Returns result dictionary.
-        """
-        logger.info("🤖 ENFORCER: Starting calendar sync...")
-
-        if not tasks:
-            logger.info("   No tasks to sync. Skipping enforcer.")
-            return {"status": "skipped", "reason": "no_tasks"}
-
-        # Build task list for AI
-        task_list_str = "\n".join([f"- 🤖 {t.description}" for t in tasks])
+        logger.info("🤖 SMART SYNC: Starting AI-powered email-to-calendar sync...")
 
         prompt = f"""
-MISSION: Synchronize my Outlook Calendar with my Task List.
+MISSION: Intelligently sync my flagged Outlook emails to my calendar.
 
-STEP 1: Navigate to {Config.CALENDAR_URL}
-STEP 2: Review all events for THIS WEEK
+STEP 1: Go to {Config.FLAGGED_FOLDER}
+- Look at all flagged emails in the list
+- Note the sender, subject, and preview text for each
 
-MY TASK LIST (Source of Truth):
-{task_list_str}
+STEP 2: For each flagged email, click to open it and:
+- Read the full email content
+- Identify: What is this about? Is there a deadline? Any action items?
+- Extract key details: dates, times, people involved, topic
+
+STEP 3: Go to {Config.CALENDAR_URL}
+- Check if a calendar event already exists for each flagged email topic
+- Look for events starting with "🤖" (these are bot-managed)
+
+STEP 4: For each flagged email that DOESN'T have a matching calendar event:
+- Create a new event with:
+  - Title: "🤖 [Action verb] - [Brief topic]" (e.g., "🤖 Review - Q4 Budget Report")
+  - Date/Time: If the email mentions a deadline, use that. Otherwise, schedule for tomorrow 9:00 AM
+  - Duration: 30 minutes (or longer if the task seems complex)
+  - Description: Include key context from the email:
+    * From: [sender name]
+    * Subject: [email subject]
+    * Summary: [2-3 sentence summary of what needs to be done]
+    * Original email date: [when the email was received]
+
+STEP 5: Clean up
+- If you find any "🤖" calendar events that don't match a current flagged email, DELETE them
+- This keeps the calendar in sync with what's actually flagged
 
 RULES:
-1. SAFETY: Only modify events that start with "🤖" emoji. Never touch other events.
-2. DELETE: Remove any "🤖" calendar events NOT in the list above.
-3. CREATE: Add missing tasks as new events (schedule for 9:00 AM tomorrow, 30 min duration).
-4. REPORT: List all changes made (created/deleted events).
+- SAFETY: Only create/modify/delete events that start with "🤖"
+- Never touch other calendar events
+- Be smart about extracting deadlines from email content
+- If an email mentions "by Friday" or "end of week", schedule appropriately
+
+REPORT: At the end, list:
+- How many flagged emails found
+- How many calendar events created
+- How many calendar events deleted
+- Brief summary of each event created
 
 Begin now.
 """
@@ -273,7 +169,12 @@ Begin now.
                 result["result"] = str(agent_result)
                 result["attempts"] = attempt + 1
 
-                logger.info("   ✅ Enforcer completed successfully")
+                logger.info("   ✅ Smart sync completed successfully")
+
+                # Optionally log to sheets
+                if self.sheets_enabled:
+                    self._log_to_sheet(result)
+
                 break
 
             except Exception as e:
@@ -284,33 +185,146 @@ Begin now.
                     await asyncio.sleep(Config.RETRY_DELAY)
                 else:
                     result["status"] = "failed"
-                    self.errors.append({"phase": "enforcer", "error": str(e), "time": datetime.now()})
+                    self.errors.append({"phase": "smart_sync", "error": str(e), "time": datetime.now()})
 
         return result
 
+    # ================= PROCESS SINGLE EMAIL =================
+    async def process_single_email(self, email_identifier: str) -> Dict:
+        """
+        Process a specific email and create a calendar event for it.
+        email_identifier can be sender name, subject keywords, etc.
+        """
+        logger.info(f"🤖 Processing single email: {email_identifier}")
+
+        prompt = f"""
+TASK: Find and process a specific email, then create a calendar event.
+
+STEP 1: Go to {Config.INBOX_URL}
+- Search for: {email_identifier}
+- Open the most relevant email
+
+STEP 2: Read the email carefully and extract:
+- Sender name and email
+- Subject line
+- Key dates or deadlines mentioned
+- Action items or requests
+- Level of urgency
+
+STEP 3: Go to {Config.CALENDAR_URL}
+- Create a new calendar event:
+  - Title: "🤖 [Action] - [Topic from email]"
+  - Date: Use deadline from email, or tomorrow if none mentioned
+  - Time: 9:00 AM (or time mentioned in email)
+  - Duration: Based on complexity (30 min for simple, 1 hour for complex)
+  - Description:
+    * From: [sender]
+    * Subject: [subject]
+    * Summary: [What needs to be done]
+    * Key dates: [Any deadlines mentioned]
+    * Context: [Relevant details from the email]
+
+REPORT what you created.
+"""
+
+        result = {"status": "unknown", "error": None}
+
+        try:
+            agent = Agent(task=prompt, llm=self.llm)
+            agent_result = await agent.run()
+            result["status"] = "success"
+            result["result"] = str(agent_result)
+        except Exception as e:
+            result["status"] = "failed"
+            result["error"] = str(e)
+            self.errors.append({"phase": "process_single", "error": str(e), "time": datetime.now()})
+
+        return result
+
+    # ================= EMAIL SUMMARY =================
+    async def get_email_summary(self, count: int = 5) -> Dict:
+        """Get an AI-generated summary of recent/unread emails"""
+        logger.info(f"🤖 Getting summary of {count} recent emails...")
+
+        prompt = f"""
+TASK: Summarize my recent emails and identify action items.
+
+STEP 1: Go to {Config.INBOX_URL}
+- Look at the {count} most recent unread emails (or all recent if fewer unread)
+
+STEP 2: For each email, note:
+- Sender
+- Subject
+- Brief summary (1-2 sentences)
+- Any action required? (Yes/No)
+- Urgency level (High/Medium/Low)
+
+STEP 3: Provide a summary report:
+
+📧 EMAIL SUMMARY
+================
+Total emails reviewed: [number]
+
+🔴 HIGH PRIORITY:
+[List any urgent emails with action needed]
+
+🟡 MEDIUM PRIORITY:
+[List emails that need attention soon]
+
+🟢 LOW PRIORITY / FYI:
+[List informational emails]
+
+📋 ACTION ITEMS:
+1. [First action needed]
+2. [Second action needed]
+...
+
+Provide this summary now.
+"""
+
+        result = {"status": "unknown", "error": None}
+
+        try:
+            agent = Agent(task=prompt, llm=self.llm)
+            agent_result = await agent.run()
+            result["status"] = "success"
+            result["summary"] = str(agent_result)
+        except Exception as e:
+            result["status"] = "failed"
+            result["error"] = str(e)
+
+        return result
+
+    # ================= HELPER: LOG TO SHEET =================
+    def _log_to_sheet(self, result: Dict):
+        """Log sync result to Google Sheet (if enabled)"""
+        if not self.sheets_enabled:
+            return
+
+        try:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            row = [timestamp, result.get("status", ""), str(result.get("result", ""))[:500]]
+            self.worksheet.append_row(row)
+            logger.info("   📝 Logged to Google Sheet")
+        except Exception as e:
+            logger.warning(f"   ⚠️ Could not log to sheet: {e}")
+
     # ================= MAIN LOOP =================
     async def run_cycle(self):
-        """Run a single audit → enforce cycle"""
+        """Run a single sync cycle"""
         self.sync_count += 1
         logger.info(f"\n{'='*50}")
         logger.info(f"SYNC CYCLE #{self.sync_count} - {datetime.now()}")
         logger.info(f"{'='*50}")
 
-        # Phase 1: Auditor
-        tasks = self.run_auditor()
-
-        # Brief pause between phases
-        await asyncio.sleep(5)
-
-        # Phase 2: Enforcer
-        result = await self.run_enforcer(tasks)
+        # Run the smart sync
+        result = await self.run_smart_sync()
 
         self.last_sync = datetime.now()
 
         return {
             "cycle": self.sync_count,
-            "tasks_found": len(tasks),
-            "enforcer_result": result,
+            "result": result,
             "timestamp": self.last_sync
         }
 
@@ -334,6 +348,7 @@ Begin now.
             "last_sync": self.last_sync.isoformat() if self.last_sync else None,
             "sync_count": self.sync_count,
             "error_count": len(self.errors),
+            "sheets_enabled": self.sheets_enabled,
             "recent_errors": self.errors[-5:] if self.errors else []
         }
 
@@ -342,13 +357,21 @@ Begin now.
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Outlook State Sync")
-    parser.add_argument("--once", action="store_true", help="Run single cycle only")
+    parser = argparse.ArgumentParser(description="Outlook Smart Sync")
+    parser.add_argument("--once", action="store_true", help="Run single sync cycle")
+    parser.add_argument("--summary", action="store_true", help="Get email summary")
+    parser.add_argument("--process", type=str, help="Process specific email by search term")
     args = parser.parse_args()
 
     sync = OutlookStateSync()
 
-    if args.once:
+    if args.summary:
+        result = asyncio.run(sync.get_email_summary())
+        print(result.get("summary", result))
+    elif args.process:
+        result = asyncio.run(sync.process_single_email(args.process))
+        print(result)
+    elif args.once:
         asyncio.run(sync.run_cycle())
     else:
         asyncio.run(sync.run_continuous())
