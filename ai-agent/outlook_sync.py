@@ -6,10 +6,17 @@ Google Sheets integration is optional.
 """
 
 import os
+import sys
 import logging
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
+
+# Fix Windows console encoding for special characters
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 # Browser-use imports (native - no LangChain wrapper needed)
 from browser_use import Agent, BrowserProfile
@@ -146,87 +153,79 @@ class OutlookStateSync:
         ])
 
         prompt = f"""
-MISSION: Sync ONLY flagged emails from my Outlook inboxes to my calendar.
+MISSION: Find flagged emails in my Outlook inboxes and create calendar events for them.
 
-CRITICAL AUTHENTICATION WARNING:
-You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
-- DO NOT attempt to log in
-- DO NOT enter any credentials or passwords
-- DO NOT click any sign-in buttons
-- If you see a login page, something is wrong - just navigate directly to the URL
+AUTHENTICATION: You are using my pre-authenticated Edge browser. I am ALREADY LOGGED IN.
+DO NOT attempt to log in or enter any credentials.
 
-I HAVE 3 EMAIL INBOXES TO CHECK FOR FLAGGED EMAILS:
+INBOXES TO CHECK:
 {inbox_list}
 
-HOW TO FILTER FOR FLAGGED EMAILS (IMPORTANT!):
-The direct flagged email URL does NOT work. You MUST use the Filter feature:
-1. Go to the inbox URL
-2. Look for the "Filter" button/dropdown in the toolbar (near search bar)
-3. Click "Filter" and select "Flagged" from the dropdown options
-4. This will show ONLY flagged emails in the list
-5. If no flagged emails exist, the list will be empty - move to next inbox
+=== CRITICAL: HOW TO APPLY THE FLAGGED FILTER ===
+For EACH inbox, you MUST do these steps IN ORDER:
 
-STEP 1: CHECK EACH INBOX FOR FLAGGED EMAILS
-For each of the 3 inboxes:
-  a. Navigate to that inbox's URL
-  b. Wait for the page to load (2-3 seconds)
-  c. Click "Filter" button in the toolbar
-  d. Select "Flagged" from the filter options
-  e. Wait for the filtered list to load
-  f. If the list shows "No items" or is empty, clear filter and move to next inbox
-  g. For each email in the filtered list, note:
-     - Inbox name (Main/Becky/Tyler)
-     - Sender name
-     - Subject line
-     - Preview text (if visible)
+1. Navigate to the inbox URL
+2. Wait 3 seconds for page to load
+3. Click the "Filter" button (in toolbar near search)
+4. A dropdown menu will appear
+5. Click "Flagged" in that dropdown menu
+6. Wait 2 seconds for the filter to apply
+7. NOW the email list shows ONLY flagged emails
+8. If the list is empty, move to next inbox
 
-STEP 2: PROCESS EACH FLAGGED EMAIL
-For each email you found in the flagged filter:
-  a. Click to open the email
-  b. Read the full content carefully
-  c. Identify:
-     - What action is needed?
-     - Is there a deadline or date mentioned?
-     - Who is involved?
-     - Level of urgency?
-  d. Go back to check the next flagged email
+⚠️ IMPORTANT: You must click BOTH "Filter" AND "Flagged" - clicking Filter alone does nothing!
+⚠️ DO NOT extract or process emails until AFTER you click "Flagged" in the dropdown!
 
-STEP 3: CHECK CALENDAR FOR EXISTING EVENTS
-Go to {Config.CALENDAR_URL}
-- Look for any events starting with "🤖" (bot-managed events)
-- Note which flagged emails already have calendar events
+=== PHASE 1: COLLECT FLAGGED EMAILS FROM ALL INBOXES ===
 
-STEP 4: CREATE CALENDAR EVENTS
-For each flagged email that does NOT have a matching "🤖" calendar event:
-- Click "New event"
-- Title: "🤖 [Action] - [Topic]" (e.g., "🤖 Review - TR Dev Payments")
-- Date/Time: Use the deadline from email, or tomorrow 9:00 AM if none
-- Duration: 30 min (simple tasks) or 1 hour (complex)
-- Description:
-  * Inbox: [Main/Becky/Tyler]
-  * From: [sender name]
-  * Subject: [subject line]
-  * Summary: [What needs to be done - 2-3 sentences]
-  * Deadline: [If mentioned in email]
+For MAIN inbox:
+1. Go to: {Config.INBOXES[0]['inbox_url']}
+2. Wait 3 seconds
+3. Click "Filter" button
+4. Click "Flagged" in the dropdown
+5. Wait 2 seconds
+6. Note all emails shown (these are flagged emails)
 
-STEP 5: CLEAN UP OLD EVENTS
-- Find any "🤖" calendar events that no longer have a matching flagged email
-- DELETE those stale events
+For BECKY inbox:
+1. Go to: {Config.INBOXES[1]['inbox_url']}
+2. Wait 3 seconds
+3. Click "Filter" button
+4. Click "Flagged" in the dropdown
+5. Wait 2 seconds
+6. Note all emails shown (these are flagged emails)
 
-IMPORTANT RULES:
-✅ ALWAYS use Filter > Flagged to find flagged emails (direct URL doesn't work)
-✅ ONLY process emails shown in the Flagged filter
-✅ ONLY create/modify/delete calendar events starting with "🤖"
+For TYLER inbox:
+1. Go to: {Config.INBOXES[2]['inbox_url']}
+2. Wait 3 seconds
+3. Click "Filter" button
+4. Click "Flagged" in the dropdown
+5. Wait 2 seconds
+6. Note all emails shown (these are flagged emails)
+
+=== PHASE 2: CREATE CALENDAR EVENTS ===
+
+Go to: {Config.CALENDAR_URL}
+
+For each flagged email you found:
+1. Click "New event"
+2. Title: "🤖 [Action] - [Topic]" (e.g., "🤖 Review - TR Dev Payments")
+3. Date/Time: Use deadline from email, or tomorrow 9:00 AM
+4. Duration: 30 minutes
+5. Description: Include sender, subject, and summary
+6. Save the event
+
+=== RULES ===
+✅ Always click BOTH "Filter" AND "Flagged" before extracting emails
+✅ Only create calendar events starting with "🤖"
 ❌ DO NOT process emails without applying the Flagged filter first
 ❌ DO NOT touch other calendar events
 
-FINAL REPORT:
-After completing all steps, provide:
-- Total flagged emails found (broken down by inbox)
-- Calendar events created (list each with title)
-- Calendar events deleted (if any)
+=== FINAL REPORT ===
+When done, report:
+- Flagged emails found per inbox (Main: X, Becky: X, Tyler: X)
+- Calendar events created (list titles)
 
-Begin now by navigating to the first inbox (Main).
+Begin now with the MAIN inbox.
 """
 
         result = {"status": "unknown", "changes": [], "error": None}
