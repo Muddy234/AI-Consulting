@@ -35,7 +35,7 @@ class Config:
     PROFILE_DIRECTORY = os.getenv("EDGE_PROFILE", "Default")
 
     # API Keys (prefer environment variables)
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAkxpLgxmubGXIrOC2daoMq-viXThIo62Y")
 
     # Google Sheet (OPTIONAL)
     USE_SHEETS = os.getenv("USE_SHEETS", "false").lower() == "true"
