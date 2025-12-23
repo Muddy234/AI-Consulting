@@ -43,7 +43,27 @@ class Config:
     SHEET_URL = os.getenv("SHEET_URL", "")
     SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", "service_account.json")
 
-    # Outlook URLs
+    # Outlook URLs - Multiple Inboxes
+    # Each inbox has a name and its flagged email folder URL
+    INBOXES = [
+        {
+            "name": "Main",
+            "flagged_url": "https://outlook.office.com/mail/flaggedemail",
+            "inbox_url": "https://outlook.office.com/mail/0/?culture=en-us&country=us"
+        },
+        {
+            "name": "Becky",
+            "flagged_url": "https://outlook.office.com/mail/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcwAAA%3D/flaggedemail",
+            "inbox_url": "https://outlook.office.com/mail/0/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcwAAA%3D?culture=en-us&country=us"
+        },
+        {
+            "name": "Tyler",
+            "flagged_url": "https://outlook.office.com/mail/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcxAAA%3D/flaggedemail",
+            "inbox_url": "https://outlook.office.com/mail/0/AAMkADRmZjcyNTFhLTViMDgtNDU3Mi04MzAxLTRkMDI3ZDA4MzFlNwAuAAAAAAD2%2FcIGLVlKQpZElnIAii1qAQB6dVYd6VD9TYH52I8BYgv6AAAAHJcxAAA%3D?culture=en-us&country=us"
+        }
+    ]
+
+    # Legacy single URLs (for backwards compatibility)
     FLAGGED_FOLDER = "https://outlook.office.com/mail/flaggedemail"
     CALENDAR_URL = "https://outlook.office.com/calendar/view/week"
     INBOX_URL = "https://outlook.office.com/mail/inbox"
@@ -113,60 +133,98 @@ class OutlookStateSync:
     async def run_smart_sync(self) -> Dict:
         """
         AI-powered sync that:
-        1. Opens flagged emails folder
+        1. Opens flagged emails folder for EACH inbox
         2. Reads each flagged email to understand context
         3. Creates calendar events with meaningful details
         """
         logger.info("🤖 SMART SYNC: Starting AI-powered email-to-calendar sync...")
+        logger.info(f"   Checking {len(Config.INBOXES)} inboxes: {[i['name'] for i in Config.INBOXES]}")
+
+        # Build the inbox list for the prompt
+        inbox_list = "\n".join([
+            f"   {i+1}. {inbox['name']}: {inbox['flagged_url']}"
+            for i, inbox in enumerate(Config.INBOXES)
+        ])
 
         prompt = f"""
-MISSION: Intelligently sync my flagged Outlook emails to my calendar.
+MISSION: Sync ONLY flagged emails from my Outlook inboxes to my calendar.
 
-IMPORTANT: You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
-DO NOT attempt to log in, enter credentials, or click any sign-in buttons.
-If you see a login page, wait a moment - you may need to refresh, or just navigate directly to the URL.
+CRITICAL AUTHENTICATION WARNING:
+You are using my pre-authenticated Edge browser session. I am ALREADY LOGGED IN to Outlook.
+- DO NOT attempt to log in
+- DO NOT enter any credentials or passwords
+- DO NOT click any sign-in buttons
+- If you see a login page, something is wrong - just navigate directly to the URL
 
-STEP 1: Go to {Config.FLAGGED_FOLDER}
-- Look at all flagged emails in the list
-- Note the sender, subject, and preview text for each
+I HAVE 3 EMAIL INBOXES TO CHECK FOR FLAGGED EMAILS:
+{inbox_list}
 
-STEP 2: For each flagged email, click to open it and:
-- Read the full email content
-- Identify: What is this about? Is there a deadline? Any action items?
-- Extract key details: dates, times, people involved, topic
+HOW TO IDENTIFY FLAGGED EMAILS:
+- Flagged emails have a RED FLAG ICON (🚩) next to them
+- The flag appears on the right side of the email row in the list
+- ONLY process emails that have this flag icon visible
+- If an email does NOT have a flag icon, SKIP IT completely
+- Newsletters, automated emails, or regular emails should be IGNORED unless flagged
 
-STEP 3: Go to {Config.CALENDAR_URL}
-- Check if a calendar event already exists for each flagged email topic
-- Look for events starting with "🤖" (these are bot-managed)
+STEP 1: CHECK EACH INBOX FOR FLAGGED EMAILS
+For each of the 3 inboxes above:
+  a. Navigate to that inbox's flagged URL
+  b. Wait for the page to load (2-3 seconds)
+  c. Look at the email list - ONLY note emails that have the flag icon (🚩)
+  d. If the folder shows "No items" or is empty, move to the next inbox
+  e. For each FLAGGED email visible, note:
+     - Inbox name (Main/Becky/Tyler)
+     - Sender name
+     - Subject line
+     - Preview text (if visible)
 
-STEP 4: For each flagged email that DOESN'T have a matching calendar event:
-- Create a new event with:
-  - Title: "🤖 [Action verb] - [Brief topic]" (e.g., "🤖 Review - Q4 Budget Report")
-  - Date/Time: If the email mentions a deadline, use that. Otherwise, schedule for tomorrow 9:00 AM
-  - Duration: 30 minutes (or longer if the task seems complex)
-  - Description: Include key context from the email:
-    * From: [sender name]
-    * Subject: [email subject]
-    * Summary: [2-3 sentence summary of what needs to be done]
-    * Original email date: [when the email was received]
+STEP 2: PROCESS EACH FLAGGED EMAIL
+For each email you identified as flagged:
+  a. Click to open the email
+  b. Read the full content carefully
+  c. Identify:
+     - What action is needed?
+     - Is there a deadline or date mentioned?
+     - Who is involved?
+     - Level of urgency?
+  d. Go back to check the next flagged email
 
-STEP 5: Clean up
-- If you find any "🤖" calendar events that don't match a current flagged email, DELETE them
-- This keeps the calendar in sync with what's actually flagged
+STEP 3: CHECK CALENDAR FOR EXISTING EVENTS
+Go to {Config.CALENDAR_URL}
+- Look for any events starting with "🤖" (bot-managed events)
+- Note which flagged emails already have calendar events
 
-RULES:
-- SAFETY: Only create/modify/delete events that start with "🤖"
-- Never touch other calendar events
-- Be smart about extracting deadlines from email content
-- If an email mentions "by Friday" or "end of week", schedule appropriately
+STEP 4: CREATE CALENDAR EVENTS
+For each flagged email that does NOT have a matching "🤖" calendar event:
+- Click "New event"
+- Title: "🤖 [Action] - [Topic]" (e.g., "🤖 Review - TR Dev Payments")
+- Date/Time: Use the deadline from email, or tomorrow 9:00 AM if none
+- Duration: 30 min (simple tasks) or 1 hour (complex)
+- Description:
+  * Inbox: [Main/Becky/Tyler]
+  * From: [sender name]
+  * Subject: [subject line]
+  * Summary: [What needs to be done - 2-3 sentences]
+  * Deadline: [If mentioned in email]
 
-REPORT: At the end, list:
-- How many flagged emails found
-- How many calendar events created
-- How many calendar events deleted
-- Brief summary of each event created
+STEP 5: CLEAN UP OLD EVENTS
+- Find any "🤖" calendar events that no longer have a matching flagged email
+- DELETE those stale events
 
-Begin now.
+IMPORTANT RULES:
+✅ ONLY process emails that have the flag icon (🚩) visible
+✅ ONLY create/modify/delete calendar events starting with "🤖"
+❌ DO NOT process newsletters, automated emails, or unflagged items
+❌ DO NOT touch other calendar events
+❌ DO NOT create events for emails without a flag
+
+FINAL REPORT:
+After completing all steps, provide:
+- Total flagged emails found (broken down by inbox)
+- Calendar events created (list each with title)
+- Calendar events deleted (if any)
+
+Begin now by navigating to the first inbox's flagged folder.
 """
 
         result = {"status": "unknown", "changes": [], "error": None}
