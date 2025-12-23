@@ -36,7 +36,7 @@ class Config:
     EDGE_EXE_PATH = os.getenv("EDGE_EXE_PATH", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 
     # API Keys (prefer environment variables)
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAkxpLgxmubGXIrOC2daoMq-viXThIo62Y")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "AIzaSyAzZTMgpJQh1QcIT5cTU3wOinW93nnNTng")
 
     # Google Sheet (OPTIONAL)
     USE_SHEETS = os.getenv("USE_SHEETS", "false").lower() == "true"
