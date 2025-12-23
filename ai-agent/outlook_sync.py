@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 # Browser-use imports (native - no LangChain wrapper needed)
-from browser_use import Agent
+from browser_use import Agent, BrowserProfile
 from browser_use.llm.models import ChatGoogle
 
 # ================= LOGGING SETUP =================
@@ -65,6 +65,14 @@ class OutlookStateSync:
 
         # Initialize LLM (browser_use native - not LangChain)
         self.llm = ChatGoogle(model="gemini-2.0-flash")
+
+        # Initialize browser profile to use existing Edge session (already logged into Outlook)
+        self.browser_profile = BrowserProfile(
+            user_data_dir=Config.EDGE_PATH,
+            headless=False,
+            channel="msedge"  # Use Microsoft Edge
+        )
+        logger.info(f"   Using Edge profile: {Config.EDGE_PATH}")
 
         # Optional: Google Sheets
         self.sheets_enabled = False
@@ -160,7 +168,8 @@ Begin now.
 
                 agent = Agent(
                     task=prompt,
-                    llm=self.llm
+                    llm=self.llm,
+                    browser_profile=self.browser_profile
                 )
 
                 agent_result = await agent.run()
@@ -230,7 +239,7 @@ REPORT what you created.
         result = {"status": "unknown", "error": None}
 
         try:
-            agent = Agent(task=prompt, llm=self.llm)
+            agent = Agent(task=prompt, llm=self.llm, browser_profile=self.browser_profile)
             agent_result = await agent.run()
             result["status"] = "success"
             result["result"] = str(agent_result)
@@ -285,7 +294,7 @@ Provide this summary now.
         result = {"status": "unknown", "error": None}
 
         try:
-            agent = Agent(task=prompt, llm=self.llm)
+            agent = Agent(task=prompt, llm=self.llm, browser_profile=self.browser_profile)
             agent_result = await agent.run()
             result["status"] = "success"
             result["summary"] = str(agent_result)
