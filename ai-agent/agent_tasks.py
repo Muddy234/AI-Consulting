@@ -2,10 +2,12 @@
 Agent Tasks - Modular Task System for Browser Automation
 =========================================================
 Add new capabilities by creating task templates.
+Supports both Windows (Edge) and Raspberry Pi (Chromium).
 """
 
 import os
 import sys
+import platform
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 import asyncio
@@ -22,6 +24,41 @@ from browser_use.llm.models import ChatGoogle
 logger = logging.getLogger(__name__)
 
 
+def get_browser_profile():
+    """
+    Create browser profile based on platform.
+    - Windows: Uses Edge with user's profile
+    - Linux/Pi: Uses Chromium with user's profile
+    """
+    browser_type = os.getenv("BROWSER_TYPE", "auto").lower()
+
+    # Auto-detect platform
+    if browser_type == "auto":
+        if sys.platform == 'win32':
+            browser_type = "edge"
+        else:
+            browser_type = "chromium"
+
+    if browser_type == "edge":
+        # Windows Edge configuration
+        username = os.getenv("OUTLOOK_USERNAME", os.getenv("USERNAME", "User"))
+        return BrowserProfile(
+            executable_path=os.getenv("EDGE_EXE_PATH", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+            user_data_dir=os.getenv("EDGE_PATH", f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\Edge\\User Data"),
+            profile_directory=os.getenv("EDGE_PROFILE", "Default"),
+            headless=os.getenv("HEADLESS", "false").lower() == "true",
+        )
+    else:
+        # Linux/Raspberry Pi Chromium configuration
+        home = os.path.expanduser("~")
+        return BrowserProfile(
+            executable_path=os.getenv("CHROMIUM_PATH", "/usr/bin/chromium-browser"),
+            user_data_dir=os.getenv("CHROMIUM_USER_DATA", f"{home}/.config/chromium"),
+            profile_directory=os.getenv("CHROMIUM_PROFILE", "Default"),
+            headless=os.getenv("HEADLESS", "false").lower() == "true",
+        )
+
+
 class AgentTaskRunner:
     """
     Universal task runner that can execute various browser automation tasks.
@@ -35,14 +72,9 @@ class AgentTaskRunner:
     """
 
     def __init__(self):
-        # Browser profile using existing Edge session
-        username = os.getenv("OUTLOOK_USERNAME", "NateMcBride")
-        self.browser_profile = BrowserProfile(
-            executable_path=os.getenv("EDGE_EXE_PATH", r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-            user_data_dir=os.getenv("EDGE_PATH", f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\Edge\\User Data"),
-            profile_directory=os.getenv("EDGE_PROFILE", "Default"),
-            headless=False,
-        )
+        # Browser profile - auto-detects platform
+        self.browser_profile = get_browser_profile()
+        logger.info(f"Browser profile configured for: {os.getenv('BROWSER_TYPE', 'auto')}")
 
         # LLM
         api_key = os.getenv("GOOGLE_API_KEY")
