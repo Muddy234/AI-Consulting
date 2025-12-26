@@ -2,3 +2,4 @@ ai-agent/outlook_sync.py
 /ai-agent/__pycache__
 ai-agent/.env.example
 ai-agent/.env.example
+ai-agent/.env
