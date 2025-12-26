@@ -203,13 +203,25 @@ CRITICAL GUIDELINES FOR EFFECTIVE SEARCHING:
    - If a page seems generic/unrelated, don't keep scrolling - go back and refine the search
    - Use Google as the universal fallback: search "[specific item] recommendations site:[current site]"
 
-5. OTHER GUIDELINES:
+5. PARSING USER REQUESTS (CRITICAL):
+   - Extract ONLY the item/product/book name from the request
+   - IGNORE conversational fluff: "Thanks", "Please", "Can you", "Hi", "Hey", etc.
+   - Example: "Thanks. Add He Who Fights With Monsters to cart"
+     → Item = "He Who Fights With Monsters" (NOT "Thanks. He Who Fights With Monsters")
+
+6. SCOPE - DO ONLY WHAT WAS ASKED:
+   - Complete the requested task and STOP
+   - Do NOT add bonus features, recommendations, or extra suggestions
+   - If asked to "add to cart" → add to cart, confirm, done
+   - If asked to "research" → research, summarize, done
+   - Keep responses focused and minimal
+
+7. OTHER GUIDELINES:
    - Be specific and actionable in your steps
    - Anticipate real-world issues (login prompts, CAPTCHAs, out of stock, etc.)
    - Set realistic timeouts based on task complexity
    - Always have fallback strategies
    - Success criteria should be measurable
-   - Consider the user's implicit preferences (quality, price, speed)
 """
 
     async def plan_task(self, user_request: str, task_type: Optional[TaskType] = None) -> TaskPlan:
@@ -298,11 +310,30 @@ This is an EMAIL/CALENDAR task using Outlook Web (outlook.office.com).
 """,
             TaskType.SHOPPING: """
 This is a SHOPPING task, typically on Amazon.
+
+PARSING THE ITEM NAME (CRITICAL):
+- Extract ONLY the product/book name from the request
+- IGNORE conversational words like: "Thanks", "Please", "Can you", "Hi", "Hey"
+- Example: "Thanks. Can you add He Who Fights With Monsters to my cart?"
+  → Item name is: "He Who Fights With Monsters" (NOT "Thanks. He Who Fights With Monsters")
+
+SCOPE - DO ONLY WHAT WAS ASKED:
+- If asked to "add to cart" → just add to cart, done
+- If asked to "find" → find and report, done
+- Do NOT provide recommendations unless specifically asked
+- Do NOT add extra features or suggestions
+- Keep it simple - complete the task and stop
+
+TASK RULES:
 - User wants to ADD TO CART (not complete purchase) unless specified
 - Consider: price limits, ratings (4+ stars preferred), Prime eligibility
 - Browser is pre-authenticated (no login needed)
 - If item not found, suggest alternatives
 - Watch for: out of stock, price changes, wrong item variants
+
+OUTPUT FORMAT:
+- Just confirm the action: "✅ [Item Name] added to cart"
+- No extra recommendations or suggestions unless asked
 """,
             TaskType.RESERVATION: """
 This is a RESTAURANT RESERVATION task using OpenTable.
