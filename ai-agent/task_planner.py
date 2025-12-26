@@ -445,6 +445,26 @@ MISSION: {plan.interpreted_goal}
 
 AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attempt to log in.
 
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must be a SHORT, CONCISE summary in this exact format:
+
+📚 **[Topic] Results:**
+
+• **[Item 1 Name]** by [Author/Creator]
+  [1-2 sentences max. Key points only.]
+
+• **[Item 2 Name]** by [Author/Creator]
+  [1-2 sentences max. Key points only.]
+
+(Continue for each item found)
+
+RULES FOR OUTPUT:
+- Maximum 2-3 sentences per item
+- NO raw data dumps or technical details
+- NO long descriptions or full reviews
+- NO attachments unless specifically requested
+- Just the key facts in bullet points
+
 === SUCCESS CRITERIA ===
 {criteria_text}
 
@@ -479,10 +499,10 @@ AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attemp
 ✅ Follow the steps in order
 ✅ Verify each step before proceeding
 ✅ Use fallback strategies when primary approach fails
-✅ Report progress and any issues encountered
+✅ FINAL OUTPUT must be SHORT BULLET POINTS (2-3 sentences per item MAX)
 ❌ DO NOT exceed timeout
 ❌ DO NOT retry more than {plan.max_retries} times per step
-❌ DO NOT continue if a critical step fails without a fallback
+❌ DO NOT include raw data dumps, long descriptions, or attachments
 ❌ DO NOT keep scrolling if results are not relevant - re-evaluate instead
 
 Begin execution now.
