@@ -147,6 +147,7 @@ class TaskPlanner:
 3. Anticipate what could go wrong
 4. Plan fallback strategies
 5. Define clear success criteria
+6. BUILD IN SELF-CORRECTION CHECKPOINTS
 
 You must respond with a valid JSON object (no markdown, no code blocks, just pure JSON).
 
@@ -179,13 +180,36 @@ The JSON must have this exact structure:
     "on_complete_failure": "What to report to user if everything fails"
 }
 
-IMPORTANT GUIDELINES:
-- Be specific and actionable in your steps
-- Anticipate real-world issues (login prompts, CAPTCHAs, out of stock, etc.)
-- Set realistic timeouts based on task complexity
-- Always have fallback strategies
-- Success criteria should be measurable
-- Consider the user's implicit preferences (quality, price, speed)
+CRITICAL GUIDELINES FOR EFFECTIVE SEARCHING:
+
+1. ALWAYS USE SPECIFIC SEARCH TERMS:
+   - BAD: Go to r/booksuggestions and browse
+   - GOOD: Search Google for "books like [SPECIFIC ITEM] site:reddit.com"
+   - When searching ANY site, ALWAYS include the specific item name in the search query
+   - Never just browse a general category - always search with specifics
+
+2. TARGETED VS GENERAL SEARCHES:
+   - Use Google site-specific searches: "topic site:reddit.com" or "topic site:goodreads.com"
+   - When on a site, use its search function WITH the specific item name
+   - Prefer subreddits specific to the topic (e.g., r/litrpg for LitRPG books, r/fantasy for fantasy)
+
+3. SELF-CORRECTION CHECKPOINTS (CRITICAL):
+   - After every 2-3 actions, ADD A CHECKPOINT STEP to verify progress
+   - If scrolling more than 2 times without finding relevant content, STOP and re-evaluate
+   - Checkpoint template: "CHECKPOINT: Verify current page shows results for [SPECIFIC ITEM]. If not, use fallback search."
+
+4. RE-EVALUATION TRIGGERS:
+   - If search results don't mention the specific item, STOP and try a different search
+   - If a page seems generic/unrelated, don't keep scrolling - go back and refine the search
+   - Use Google as the universal fallback: search "[specific item] recommendations site:[current site]"
+
+5. OTHER GUIDELINES:
+   - Be specific and actionable in your steps
+   - Anticipate real-world issues (login prompts, CAPTCHAs, out of stock, etc.)
+   - Set realistic timeouts based on task complexity
+   - Always have fallback strategies
+   - Success criteria should be measurable
+   - Consider the user's implicit preferences (quality, price, speed)
 """
 
     async def plan_task(self, user_request: str, task_type: Optional[TaskType] = None) -> TaskPlan:
@@ -290,10 +314,23 @@ This is a RESTAURANT RESERVATION task using OpenTable.
 """,
             TaskType.RESEARCH: """
 This is a RESEARCH task using web search.
+
+CRITICAL SEARCH STRATEGY:
+- ALWAYS use Google with site-specific searches FIRST: "[topic] site:reddit.com" or "[topic] recommendations"
+- When looking for "things like X", search for "similar to X" or "if you liked X" or "books/movies/etc like X"
+- Use niche subreddits (r/litrpg, r/fantasy, r/scifi) NOT general ones (r/books, r/booksuggestions)
+- When on Reddit/forums: SEARCH within the site for the SPECIFIC item, don't just browse
+
+SELF-CORRECTION:
+- After searching, VERIFY the results mention the specific item you're researching
+- If scrolling 2+ times without seeing relevant results, STOP and try a different search
+- If on wrong page, use Google: "[specific item] recommendations site:[current domain]"
+
+GENERAL:
 - Goal is to gather information and compile a report
 - Use multiple sources (3+) for credibility
 - Distinguish facts from opinions
-- Cite all sources
+- Cite all sources with URLs
 - Watch for: outdated info, unreliable sources, paywalls
 """,
             TaskType.PRICE_COMPARISON: """
@@ -425,6 +462,19 @@ AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attemp
 === IF EVERYTHING FAILS ===
 {plan.on_complete_failure}
 
+=== SELF-CORRECTION RULES (CRITICAL) ===
+🔄 After EVERY search, verify results are RELEVANT to the specific topic
+🔄 If scrolling more than 2 times without finding relevant content → STOP and try different search
+🔄 If on a generic page (not specific to your topic) → Go back and search with more specific terms
+🔄 Use Google site-search as fallback: "[specific topic] site:[current domain]"
+🔄 NEVER just browse general categories - ALWAYS search with the specific item name
+
+=== SEARCH STRATEGY ===
+✅ Include the SPECIFIC item/topic name in EVERY search query
+✅ Use site-specific Google searches: "topic site:reddit.com"
+✅ Use niche communities (r/litrpg, r/fantasy) over general ones (r/books)
+✅ When searching within a site, use the FULL specific query, not just keywords
+
 === IMPORTANT RULES ===
 ✅ Follow the steps in order
 ✅ Verify each step before proceeding
@@ -433,6 +483,7 @@ AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attemp
 ❌ DO NOT exceed timeout
 ❌ DO NOT retry more than {plan.max_retries} times per step
 ❌ DO NOT continue if a critical step fails without a fallback
+❌ DO NOT keep scrolling if results are not relevant - re-evaluate instead
 
 Begin execution now.
 """
