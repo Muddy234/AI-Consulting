@@ -464,6 +464,75 @@ This is a CUSTOM task that doesn't fit standard categories.
             enhanced_prompt=""  # Will be set after
         )
 
+    def _get_output_format(self, task_type: TaskType) -> str:
+        """Get task-type specific output format instructions."""
+        formats = {
+            TaskType.SHOPPING: """
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must be SHORT and confirm the action:
+
+✅ [Action completed] - [Item name]
+
+EXAMPLES:
+- "✅ Added to cart - He Who Fights With Monsters"
+- "✅ Removed from cart - He Who Fights With Monsters"
+- "✅ Item not found in cart"
+
+RULES:
+- Just confirm what was done in ONE sentence
+- NO recommendations unless asked
+- NO extra information
+- Complete the task and STOP
+""",
+            TaskType.RESEARCH: """
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must be a SHORT, CONCISE summary:
+
+📚 **Recommendations for [Original Item] fans:**
+
+• **[Title]** by [REAL Author]
+  [1-2 sentences: what it is + why it fits]
+
+RULES:
+- REAL author names only (NOT Reddit usernames)
+- Explain WHY it appeals to fans
+- Maximum 2 sentences per item
+- NO raw data or attachments
+""",
+            TaskType.RESERVATION: """
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must confirm the reservation:
+
+✅ Reservation confirmed:
+- Restaurant: [Name]
+- Date/Time: [Date and Time]
+- Party size: [Number]
+- Confirmation #: [If available]
+
+RULES:
+- Just confirm the details
+- NO extra suggestions
+""",
+            TaskType.EMAIL_SYNC: """
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must summarize what was done:
+
+✅ Email sync complete:
+- [Number] flagged emails processed
+- Calendar event created for [date]
+
+RULES:
+- Brief summary only
+- List key actions taken
+""",
+        }
+        return formats.get(task_type, """
+=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
+Your FINAL response must be SHORT and confirm what was done.
+Just state the action completed in 1-2 sentences.
+NO extra information or suggestions.
+""")
+
     def _generate_enhanced_prompt(self, plan: TaskPlan) -> str:
         """Generate an enhanced prompt for the browser agent based on the plan."""
 
@@ -487,36 +556,16 @@ STEP {s.step_number}: {s.action}
         # Format success criteria
         criteria_text = "\n".join([f"✓ {c}" for c in plan.success_criteria])
 
+        # Task-type specific output format
+        output_format = self._get_output_format(plan.task_type)
+
         prompt = f"""
 MISSION: {plan.interpreted_goal}
 
 AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attempt to log in.
 
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must be a SHORT, CONCISE summary in this exact format:
+{output_format}
 
-📚 **Recommendations for [Original Item] fans:**
-
-• **[Title]** by [REAL Author - NOT Reddit username]
-  [What it is + why fans of the original would enjoy it. 1-2 sentences MAX.]
-
-• **[Title]** by [REAL Author]
-  [What it is + why it fits. 1-2 sentences MAX.]
-
-EXAMPLE OUTPUT:
-📚 **Recommendations for Dungeon Crawler Carl fans:**
-
-• **He Who Fights With Monsters** by Shirtaloon
-  Isekai LitRPG with snarky humor and a progression system. Similar comedic tone to DCC.
-
-• **Cradle** by Will Wight
-  Cultivation fantasy with fast-paced action. The MC Eithan has Carl-like wit.
-
-RULES FOR OUTPUT:
-- REAL author names only (from Amazon/Goodreads, NOT Reddit usernames)
-- Explain WHY it appeals to fans of the original
-- Maximum 2 sentences per item
-- NO raw data, NO Reddit usernames, NO attachments
 
 === SUCCESS CRITERIA ===
 {criteria_text}
@@ -535,28 +584,15 @@ RULES FOR OUTPUT:
 === IF EVERYTHING FAILS ===
 {plan.on_complete_failure}
 
-=== SELF-CORRECTION RULES (CRITICAL) ===
-🔄 After EVERY search, verify results are RELEVANT to the specific topic
-🔄 If scrolling more than 2 times without finding relevant content → STOP and try different search
-🔄 If on a generic page (not specific to your topic) → Go back and search with more specific terms
-🔄 Use Google site-search as fallback: "[specific topic] site:[current domain]"
-🔄 NEVER just browse general categories - ALWAYS search with the specific item name
-
-=== SEARCH STRATEGY ===
-✅ Include the SPECIFIC item/topic name in EVERY search query
-✅ Use site-specific Google searches: "topic site:reddit.com"
-✅ Use niche communities (r/litrpg, r/fantasy) over general ones (r/books)
-✅ When searching within a site, use the FULL specific query, not just keywords
-
 === IMPORTANT RULES ===
 ✅ Follow the steps in order
 ✅ Verify each step before proceeding
-✅ Use fallback strategies when primary approach fails
-✅ FINAL OUTPUT must be SHORT BULLET POINTS (2-3 sentences per item MAX)
+✅ When task is COMPLETE, use "done" action immediately - do NOT continue
+✅ Keep output SHORT - confirm action and stop
 ❌ DO NOT exceed timeout
 ❌ DO NOT retry more than {plan.max_retries} times per step
-❌ DO NOT include raw data dumps, long descriptions, or attachments
-❌ DO NOT keep scrolling if results are not relevant - re-evaluate instead
+❌ DO NOT add extra features or recommendations unless asked
+❌ DO NOT continue after the task is complete
 
 Begin execution now.
 """
