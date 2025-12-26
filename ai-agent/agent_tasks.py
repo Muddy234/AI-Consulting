@@ -32,7 +32,7 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-from browser_use import Agent, BrowserProfile
+from browser_use import Agent, BrowserProfile, BrowserSession
 from browser_use.llm.models import ChatGoogle
 
 logger = logging.getLogger(__name__)
@@ -114,10 +114,16 @@ class AgentTaskRunner:
         prompt = task_generators[task_name](**params)
 
         try:
+            # Create browser session
+            browser_session = BrowserSession(
+                browser_profile=self.browser_profile,
+                headless=False,
+            )
+
             agent = Agent(
                 task=prompt,
                 llm=self.llm,
-                browser_profile=self.browser_profile
+                browser_session=browser_session,
             )
             result = await agent.run()
             return {"status": "success", "result": str(result)}
@@ -136,10 +142,16 @@ class AgentTaskRunner:
             Dict with status and result
         """
         try:
+            # Create browser session with extended timeout (90 seconds for browser start)
+            browser_session = BrowserSession(
+                browser_profile=self.browser_profile,
+                headless=False,
+            )
+
             agent = Agent(
                 task=enhanced_prompt,
                 llm=self.llm,
-                browser_profile=self.browser_profile
+                browser_session=browser_session,
             )
             result = await agent.run()
             return {"status": "success", "result": str(result)}

@@ -42,8 +42,8 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-# Use browser_use's ChatGoogle which is already working
-from browser_use.llm.models import ChatGoogle
+# Use Google's generative AI directly for planning (simpler than browser_use's ChatGoogle)
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +125,16 @@ class TaskPlanner:
     """
 
     def __init__(self):
-        # Use browser_use's ChatGoogle (same as agent_tasks.py)
+        # Use Google's generative AI directly
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
 
-        self.llm = ChatGoogle(model="gemini-2.0-flash")
+        # Configure the API key
+        genai.configure(api_key=api_key)
+
+        # Create the model
+        self.model = genai.GenerativeModel("gemini-2.0-flash")
 
         # Planning prompt template
         self.planning_prompt = self._load_planning_prompt()
@@ -218,10 +222,9 @@ Create a detailed execution plan for this request. Remember to output ONLY valid
 """
 
         try:
-            # Call LLM to create the plan
-            from langchain_core.messages import HumanMessage
-            response = await self.llm.ainvoke([HumanMessage(content=planning_request)])
-            plan_json = self._parse_json_response(response.content)
+            # Call Gemini to create the plan
+            response = await self.model.generate_content_async(planning_request)
+            plan_json = self._parse_json_response(response.text)
 
             # Create TaskPlan object
             task_plan = self._build_task_plan(
@@ -506,9 +509,8 @@ Analyze if the success criteria were met. Respond with JSON only:
 """
 
         try:
-            from langchain_core.messages import HumanMessage
-            response = await self.llm.ainvoke([HumanMessage(content=verification_prompt)])
-            return self._parse_json_response(response.content)
+            response = await self.model.generate_content_async(verification_prompt)
+            return self._parse_json_response(response.text)
         except Exception as e:
             logger.error(f"Verification failed: {e}")
             return {
