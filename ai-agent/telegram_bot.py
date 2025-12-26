@@ -29,12 +29,23 @@ from dotenv import load_dotenv
 SCRIPT_DIR = Path(__file__).parent.resolve()
 ENV_FILE = SCRIPT_DIR / ".env"
 
+print(f"📂 Looking for .env at: {ENV_FILE}")
+
 # Load .env from the script's directory
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
-    print(f"✅ Loaded .env from: {ENV_FILE}")
+    print(f"✅ Loaded .env file successfully!")
+    # Debug: show what was loaded (masked)
+    api_key = os.getenv("GOOGLE_API_KEY", "")
+    if api_key:
+        print(f"   GOOGLE_API_KEY: {api_key[:10]}...{api_key[-4:]}")
+    else:
+        print("   ⚠️ GOOGLE_API_KEY is empty in .env file!")
 else:
-    print(f"⚠️ No .env file found at: {ENV_FILE}")
+    print(f"❌ ERROR: .env file NOT FOUND!")
+    print(f"   Please create a file called '.env' at:")
+    print(f"   {ENV_FILE}")
+    print(f"   With your API keys inside.")
     load_dotenv()  # Try default locations anyway
 
 # Fix Windows console encoding
