@@ -24,8 +24,18 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 # Load environment variables from .env file FIRST
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).parent.resolve()
+ENV_FILE = SCRIPT_DIR / ".env"
+
+# Load .env from the script's directory
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+else:
+    load_dotenv()  # Try default locations
 
 # Fix Windows encoding
 if sys.platform == 'win32':

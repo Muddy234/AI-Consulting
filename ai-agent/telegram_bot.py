@@ -22,8 +22,20 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 # Load environment variables from .env file FIRST
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+
+# Get the directory where this script is located
+SCRIPT_DIR = Path(__file__).parent.resolve()
+ENV_FILE = SCRIPT_DIR / ".env"
+
+# Load .env from the script's directory
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE)
+    print(f"✅ Loaded .env from: {ENV_FILE}")
+else:
+    print(f"⚠️ No .env file found at: {ENV_FILE}")
+    load_dotenv()  # Try default locations anyway
 
 # Fix Windows console encoding
 if sys.platform == 'win32':
