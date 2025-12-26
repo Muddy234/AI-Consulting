@@ -348,32 +348,34 @@ This is a RESEARCH task using web search.
 
 *** TWO-STEP RESEARCH PROCESS (CRITICAL) ***
 
-STEP 1 - GATHER RECOMMENDATIONS:
-- Search Reddit/forums/Goodreads for recommendations
-- Extract just the TITLES of recommended items
-- Reddit usernames are NOT authors - ignore them
-- Focus on finding WHAT is recommended, not WHO recommended it
+STEP 1 - GATHER RECOMMENDATIONS/INFO:
+- Search Google, Reddit, forums, or relevant sites for the topic
+- Extract the NAMES/TITLES of recommended items
+- Reddit usernames are NOT creators - ignore them
+- Focus on WHAT is being recommended, not WHO recommended it
 
-STEP 2 - RESEARCH EACH ITEM:
-- For each title found, search Google/Amazon/Wikipedia for REAL info
-- Find the ACTUAL author/creator (not Reddit usernames!)
+STEP 2 - VERIFY AND ENRICH:
+- For each item found, search for REAL info (official sites, Wikipedia, etc.)
+- Find ACTUAL details (creator, location, brand, key features)
 - Get a brief description of what it is
-- Understand WHY it would appeal to fans of the original item
+- Understand WHY it matches the user's request
 
-EXAMPLE - If searching "books like Dungeon Crawler Carl":
-1. Find titles: "He Who Fights Monsters", "Cradle", etc.
-2. Research each: "He Who Fights Monsters" → Author: Shirtaloon, LitRPG with humor
-3. Explain fit: "Similar comedic tone and progression mechanics"
+EXAMPLES:
+- Books: Find titles → verify authors on Amazon/Goodreads
+- Restaurants: Find names → verify location, cuisine, ratings on Yelp/Google
+- Products: Find names → verify specs, prices on official sites
+- Travel: Find destinations → verify attractions, best times to visit
 
 CRITICAL RULES:
-- NEVER use Reddit usernames as authors
-- ALWAYS verify author names from Amazon/Goodreads
-- Explain WHY each recommendation fits, not just list them
+- NEVER use Reddit usernames as creators/owners
+- ALWAYS verify details from official or authoritative sources
+- Explain WHY each item matches the request
+- Adapt your approach based on what's being researched
 
 SEARCH STRATEGY:
-- Use Google site-specific searches: "[topic] site:reddit.com"
-- Use niche subreddits (r/litrpg, r/fantasy) NOT general ones
-- After finding titles, search "[Book Title] author" to verify
+- Use Google site-specific searches: "[topic] site:reddit.com" or "[topic] site:yelp.com"
+- Use niche communities relevant to the topic
+- Cross-reference with official sources
 
 GENERAL:
 - Goal is to provide useful recommendations with context
@@ -486,18 +488,23 @@ RULES:
 """,
             TaskType.RESEARCH: """
 === REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must be a SHORT, CONCISE summary:
+Your FINAL response must be a SHORT, CONCISE summary appropriate for the topic.
 
-📚 **Recommendations for [Original Item] fans:**
+FORMAT (adapt to what's being researched):
+• **[Item/Name]** - [Key identifier like author, location, brand, etc. if applicable]
+  [1-2 sentences: brief description + why it's relevant to the request]
 
-• **[Title]** by [REAL Author]
-  [1-2 sentences: what it is + why it fits]
+EXAMPLES:
+- For books: "**Cradle** by Will Wight - Fast-paced cultivation fantasy with witty characters."
+- For restaurants: "**Carbone** - Italian, Greenwich Village - Upscale Italian with famous spicy rigatoni."
+- For products: "**Sony WH-1000XM5** - Best-in-class noise cancellation, 30hr battery."
+- For travel: "**Kyoto, Japan** - Best in spring for cherry blossoms, temples, and traditional culture."
 
 RULES:
-- REAL author names only (NOT Reddit usernames)
-- Explain WHY it appeals to fans
-- Maximum 2 sentences per item
-- NO raw data or attachments
+- Adapt the format to fit what's being researched
+- Keep each item to 1-2 sentences MAX
+- Focus on WHY each item matches the user's request
+- NO raw data dumps or excessive details
 """,
             TaskType.RESERVATION: """
 === REQUIRED OUTPUT FORMAT (CRITICAL) ===
