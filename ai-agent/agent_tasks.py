@@ -126,7 +126,10 @@ class AgentTaskRunner:
                 browser_session=browser_session,
             )
             result = await agent.run()
-            return {"status": "success", "result": str(result)}
+
+            # Extract clean final result from AgentHistoryList
+            clean_result = self._extract_final_result(result)
+            return {"status": "success", "result": clean_result}
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
@@ -154,9 +157,34 @@ class AgentTaskRunner:
                 browser_session=browser_session,
             )
             result = await agent.run()
-            return {"status": "success", "result": str(result)}
+
+            # Extract clean final result from AgentHistoryList
+            clean_result = self._extract_final_result(result)
+            return {"status": "success", "result": clean_result}
         except Exception as e:
             return {"status": "error", "message": str(e)}
+
+    def _extract_final_result(self, agent_history) -> str:
+        """
+        Extract a clean, human-readable result from the AgentHistoryList.
+        Returns only the final extracted content, not the full history.
+        """
+        try:
+            # Look for the final done result with extracted_content
+            if hasattr(agent_history, 'all_results'):
+                for action_result in reversed(agent_history.all_results):
+                    if action_result.is_done and action_result.extracted_content:
+                        return action_result.extracted_content
+
+            # Fallback: try to get final_result if available
+            if hasattr(agent_history, 'final_result'):
+                return str(agent_history.final_result())
+
+            # Last resort: return a summarized version
+            return "Task completed. Check browser for results."
+        except Exception as e:
+            logger.warning(f"Could not extract clean result: {e}")
+            return "Task completed."
 
     # =====================================================
     # TASK: Email To-Do List (already implemented)
