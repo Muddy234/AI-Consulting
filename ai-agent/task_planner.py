@@ -315,23 +315,39 @@ This is a RESTAURANT RESERVATION task using OpenTable.
             TaskType.RESEARCH: """
 This is a RESEARCH task using web search.
 
-CRITICAL SEARCH STRATEGY:
-- ALWAYS use Google with site-specific searches FIRST: "[topic] site:reddit.com" or "[topic] recommendations"
-- When looking for "things like X", search for "similar to X" or "if you liked X" or "books/movies/etc like X"
-- Use niche subreddits (r/litrpg, r/fantasy, r/scifi) NOT general ones (r/books, r/booksuggestions)
-- When on Reddit/forums: SEARCH within the site for the SPECIFIC item, don't just browse
+*** TWO-STEP RESEARCH PROCESS (CRITICAL) ***
 
-SELF-CORRECTION:
-- After searching, VERIFY the results mention the specific item you're researching
-- If scrolling 2+ times without seeing relevant results, STOP and try a different search
-- If on wrong page, use Google: "[specific item] recommendations site:[current domain]"
+STEP 1 - GATHER RECOMMENDATIONS:
+- Search Reddit/forums/Goodreads for recommendations
+- Extract just the TITLES of recommended items
+- Reddit usernames are NOT authors - ignore them
+- Focus on finding WHAT is recommended, not WHO recommended it
+
+STEP 2 - RESEARCH EACH ITEM:
+- For each title found, search Google/Amazon/Wikipedia for REAL info
+- Find the ACTUAL author/creator (not Reddit usernames!)
+- Get a brief description of what it is
+- Understand WHY it would appeal to fans of the original item
+
+EXAMPLE - If searching "books like Dungeon Crawler Carl":
+1. Find titles: "He Who Fights Monsters", "Cradle", etc.
+2. Research each: "He Who Fights Monsters" → Author: Shirtaloon, LitRPG with humor
+3. Explain fit: "Similar comedic tone and progression mechanics"
+
+CRITICAL RULES:
+- NEVER use Reddit usernames as authors
+- ALWAYS verify author names from Amazon/Goodreads
+- Explain WHY each recommendation fits, not just list them
+
+SEARCH STRATEGY:
+- Use Google site-specific searches: "[topic] site:reddit.com"
+- Use niche subreddits (r/litrpg, r/fantasy) NOT general ones
+- After finding titles, search "[Book Title] author" to verify
 
 GENERAL:
-- Goal is to gather information and compile a report
-- Use multiple sources (3+) for credibility
-- Distinguish facts from opinions
-- Cite all sources with URLs
-- Watch for: outdated info, unreliable sources, paywalls
+- Goal is to provide useful recommendations with context
+- Explain why each item would appeal to the user
+- Keep final output SHORT and actionable
 """,
             TaskType.PRICE_COMPARISON: """
 This is a PRICE COMPARISON task across multiple sites.
@@ -448,22 +464,28 @@ AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attemp
 === REQUIRED OUTPUT FORMAT (CRITICAL) ===
 Your FINAL response must be a SHORT, CONCISE summary in this exact format:
 
-📚 **[Topic] Results:**
+📚 **Recommendations for [Original Item] fans:**
 
-• **[Item 1 Name]** by [Author/Creator]
-  [1-2 sentences max. Key points only.]
+• **[Title]** by [REAL Author - NOT Reddit username]
+  [What it is + why fans of the original would enjoy it. 1-2 sentences MAX.]
 
-• **[Item 2 Name]** by [Author/Creator]
-  [1-2 sentences max. Key points only.]
+• **[Title]** by [REAL Author]
+  [What it is + why it fits. 1-2 sentences MAX.]
 
-(Continue for each item found)
+EXAMPLE OUTPUT:
+📚 **Recommendations for Dungeon Crawler Carl fans:**
+
+• **He Who Fights With Monsters** by Shirtaloon
+  Isekai LitRPG with snarky humor and a progression system. Similar comedic tone to DCC.
+
+• **Cradle** by Will Wight
+  Cultivation fantasy with fast-paced action. The MC Eithan has Carl-like wit.
 
 RULES FOR OUTPUT:
-- Maximum 2-3 sentences per item
-- NO raw data dumps or technical details
-- NO long descriptions or full reviews
-- NO attachments unless specifically requested
-- Just the key facts in bullet points
+- REAL author names only (from Amazon/Goodreads, NOT Reddit usernames)
+- Explain WHY it appeals to fans of the original
+- Maximum 2 sentences per item
+- NO raw data, NO Reddit usernames, NO attachments
 
 === SUCCESS CRITERIA ===
 {criteria_text}
