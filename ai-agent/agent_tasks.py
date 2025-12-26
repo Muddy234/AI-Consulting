@@ -13,6 +13,10 @@ from typing import Dict, Optional
 import asyncio
 import logging
 
+# Load environment variables from .env file FIRST
+from dotenv import load_dotenv
+load_dotenv()
+
 # Fix Windows console encoding
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')

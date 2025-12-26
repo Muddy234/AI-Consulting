@@ -23,6 +23,10 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Load environment variables from .env file FIRST
+from dotenv import load_dotenv
+load_dotenv()
+
 # Fix Windows encoding
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')

@@ -21,6 +21,10 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional
 
+# Load environment variables from .env file FIRST
+from dotenv import load_dotenv
+load_dotenv()
+
 # Fix Windows console encoding
 if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
