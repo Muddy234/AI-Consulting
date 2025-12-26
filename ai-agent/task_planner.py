@@ -17,6 +17,7 @@ import os
 import sys
 import json
 import logging
+import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -27,7 +28,8 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-import google.generativeai as genai
+# Use browser_use's ChatGoogle which is already working
+from browser_use.llm.models import ChatGoogle
 
 logger = logging.getLogger(__name__)
 
@@ -109,13 +111,12 @@ class TaskPlanner:
     """
 
     def __init__(self):
-        # Configure Gemini
+        # Use browser_use's ChatGoogle (same as agent_tasks.py)
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
 
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.llm = ChatGoogle(model="gemini-2.0-flash")
 
         # Planning prompt template
         self.planning_prompt = self._load_planning_prompt()
@@ -203,9 +204,10 @@ Create a detailed execution plan for this request. Remember to output ONLY valid
 """
 
         try:
-            # Call Gemini to create the plan
-            response = self.model.generate_content(planning_request)
-            plan_json = self._parse_json_response(response.text)
+            # Call LLM to create the plan
+            from langchain_core.messages import HumanMessage
+            response = await self.llm.ainvoke([HumanMessage(content=planning_request)])
+            plan_json = self._parse_json_response(response.content)
 
             # Create TaskPlan object
             task_plan = self._build_task_plan(
@@ -490,8 +492,9 @@ Analyze if the success criteria were met. Respond with JSON only:
 """
 
         try:
-            response = self.model.generate_content(verification_prompt)
-            return self._parse_json_response(response.text)
+            from langchain_core.messages import HumanMessage
+            response = await self.llm.ainvoke([HumanMessage(content=verification_prompt)])
+            return self._parse_json_response(response.content)
         except Exception as e:
             logger.error(f"Verification failed: {e}")
             return {
