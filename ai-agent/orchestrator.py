@@ -56,6 +56,15 @@ class Intent(Enum):
     ACTION = "action"          # Execute a task (add to cart, reserve, etc.)
     HYBRID = "hybrid"          # Research then action
 
+    @classmethod
+    def from_value(cls, value: str) -> "Intent":
+        """Look up enum member by value (case-insensitive)."""
+        value_lower = value.lower().strip()
+        for member in cls:
+            if member.value == value_lower:
+                return member
+        return cls.RESEARCH  # Default fallback
+
 
 class Topic(Enum):
     """Topic classification for agent selection."""
@@ -66,6 +75,15 @@ class Topic(Enum):
     PRODUCTS = "products"      # General shopping, products
     EMAIL = "email"            # Email and calendar
     GENERAL = "general"        # Doesn't fit specific category
+
+    @classmethod
+    def from_value(cls, value: str) -> "Topic":
+        """Look up enum member by value (case-insensitive)."""
+        value_lower = value.lower().strip()
+        for member in cls:
+            if member.value == value_lower:
+                return member
+        return cls.GENERAL  # Default fallback
 
 
 @dataclass
@@ -239,12 +257,12 @@ Respond with JSON only:
             response = await self.model.generate_content_async(classification_prompt)
             result = self._parse_json(response.text)
 
-            # Handle case-insensitivity from LLM response
-            intent_str = result.get("intent", "research").lower()
-            topic_str = result.get("topic", "general").lower()
+            # Handle case-insensitivity from LLM response using from_value
+            intent_str = result.get("intent", "research")
+            topic_str = result.get("topic", "general")
 
-            intent = Intent(intent_str)
-            topic = Topic(topic_str)
+            intent = Intent.from_value(intent_str)
+            topic = Topic.from_value(topic_str)
 
             return intent, topic
 
