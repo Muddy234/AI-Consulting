@@ -103,6 +103,9 @@ class AIAgentBot:
         """
         Plan a task using AI, show the plan to the user, and execute it.
 
+        Uses phased execution (Discovery → Extraction → Action → Verification)
+        when available, which improves reliability for complex tasks.
+
         Args:
             update: Telegram update for sending messages
             user_request: The user's original request
@@ -121,9 +124,16 @@ class AIAgentBot:
             plan_summary = self._format_plan_summary(plan)
             await update.message.reply_text(plan_summary)
 
-            # Phase 3: Execute with enhanced prompt
-            await update.message.reply_text("🚀 Executing plan...")
-            result = await self.task_runner.run_with_prompt(plan.enhanced_prompt)
+            # Phase 3: Execute - use phased execution if available
+            if plan.unified_plan and plan.unified_plan.phase_prompts:
+                # New phased execution for better reliability
+                phases = [p.value for p in plan.unified_plan.browser_phases]
+                await update.message.reply_text(f"🚀 Executing in phases: {' → '.join(phases)}...")
+                result = await self.task_runner.run_phased(plan.unified_plan)
+            else:
+                # Fall back to single execution for simple tasks
+                await update.message.reply_text("🚀 Executing plan...")
+                result = await self.task_runner.run_with_prompt(plan.enhanced_prompt)
 
             # Phase 4: Verify result
             if result["status"] == "success":
@@ -158,10 +168,16 @@ class AIAgentBot:
         """Format a plan into a readable summary for Telegram."""
         # Show agents being used (from new orchestrator)
         agents_text = ""
+        phases_text = ""
         if plan.unified_plan and plan.unified_plan.agents_used:
             agents_list = ", ".join(plan.unified_plan.agents_used)
             agents_text = f"\nAgents: {agents_list}"
             intent_topic = f" ({plan.unified_plan.intent.value} / {plan.unified_plan.topic.value})"
+
+            # Show browser phases
+            if plan.unified_plan.browser_phases:
+                phase_names = [p.value.title() for p in plan.unified_plan.browser_phases]
+                phases_text = f"\nExecution: {' -> '.join(phase_names)}"
         else:
             intent_topic = ""
 
@@ -181,7 +197,7 @@ class AIAgentBot:
 
         return f"""Task Plan (ID: {plan.task_id}){intent_topic}
 
-Goal: {goal}{agents_text}
+Goal: {goal}{agents_text}{phases_text}
 
 Steps:
 {steps_text}

@@ -43,7 +43,7 @@ if sys.platform == 'win32':
 import google.generativeai as genai
 
 # Import new orchestrator and agent system
-from orchestrator import Orchestrator, UnifiedPlan, Intent, Topic
+from orchestrator import Orchestrator, UnifiedPlan, Intent, Topic, BrowserPhase
 from agent_loader import AgentLoader
 
 logger = logging.getLogger(__name__)
@@ -471,12 +471,27 @@ async def plan_and_describe(request: str) -> str:
         description += f"**Agents:** {', '.join(plan.unified_plan.agents_used)}\n"
         description += f"**Intent:** {plan.unified_plan.intent.value} | **Topic:** {plan.unified_plan.topic.value}\n\n"
 
+        # Show browser phases (new phased execution)
+        if plan.unified_plan.browser_phases:
+            description += "**Browser Phases:**\n"
+            for phase in plan.unified_plan.browser_phases:
+                phase_desc = {
+                    BrowserPhase.DISCOVERY: "🔍 Discovery - Find targets and collect URLs",
+                    BrowserPhase.EXTRACTION: "📋 Extraction - Get detailed info from pages",
+                    BrowserPhase.ACTION: "⚡ Action - Execute the requested operation",
+                    BrowserPhase.VERIFICATION: "✅ Verification - Confirm success"
+                }.get(phase, f"📌 {phase.value}")
+                description += f"  {phase_desc}\n"
+            description += "\n"
+
     description += "**Steps:**\n"
-    for step in plan.steps:
+    for step in plan.steps[:10]:  # Limit to first 10 steps for readability
         description += f"{step.step_number}. {step.action}\n"
+    if len(plan.steps) > 10:
+        description += f"... and {len(plan.steps) - 10} more steps\n"
 
     description += "\n**Success Criteria:**\n"
-    for criterion in plan.success_criteria:
+    for criterion in plan.success_criteria[:5]:
         description += f"✓ {criterion}\n"
 
     description += f"""

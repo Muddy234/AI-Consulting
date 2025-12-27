@@ -66,6 +66,27 @@ class Intent(Enum):
         return cls.RESEARCH  # Default fallback
 
 
+class BrowserPhase(Enum):
+    """
+    Browser execution phases - each runs in a separate browser session.
+    This prevents long execution plans from overwhelming the browser agent.
+    """
+    DISCOVERY = "discovery"        # Find URLs, names, basic info from search results
+    EXTRACTION = "extraction"      # Scrape detailed data from specific pages
+    ACTION = "action"              # Execute state-changing operations
+    VERIFICATION = "verification"  # Confirm actions completed successfully
+
+    @classmethod
+    def phases_for_intent(cls, intent: Intent) -> List["BrowserPhase"]:
+        """Get the phases needed for a given intent."""
+        if intent == Intent.RESEARCH:
+            return [cls.DISCOVERY, cls.EXTRACTION]
+        elif intent == Intent.ACTION:
+            return [cls.ACTION, cls.VERIFICATION]
+        else:  # HYBRID
+            return [cls.DISCOVERY, cls.EXTRACTION, cls.ACTION, cls.VERIFICATION]
+
+
 class Topic(Enum):
     """Topic classification for agent selection."""
     FOOD = "food"              # Restaurants, dining, recipes
@@ -123,8 +144,12 @@ class UnifiedPlan:
     success_criteria: List[str]
     verification_checkpoints: List[Dict]
 
-    # Final prompt for executor
+    # Final prompt for executor (legacy - single prompt for all phases)
     executor_prompt: str
+
+    # Phase-specific prompts (new - separate prompt per browser phase)
+    browser_phases: List[BrowserPhase] = field(default_factory=list)
+    phase_prompts: Dict[str, str] = field(default_factory=dict)  # phase_name -> prompt
 
     # Metadata
     estimated_duration: str
@@ -536,6 +561,18 @@ Respond with JSON only:
             sub_plans=sub_plans
         )
 
+        # Determine browser phases needed for this intent
+        browser_phases = BrowserPhase.phases_for_intent(intent)
+
+        # Generate phase-specific prompts for focused execution
+        phase_prompts = self._generate_phase_prompts(
+            user_request=user_request,
+            intent=intent,
+            topic=topic,
+            sub_plans=sub_plans,
+            browser_phases=browser_phases
+        )
+
         return UnifiedPlan(
             task_id=str(uuid.uuid4())[:8],
             original_request=user_request,
@@ -547,6 +584,8 @@ Respond with JSON only:
             success_criteria=all_success_criteria,
             verification_checkpoints=verification_checkpoints,
             executor_prompt=executor_prompt,
+            browser_phases=browser_phases,
+            phase_prompts=phase_prompts,
             estimated_duration=self._estimate_duration(execution_phases),
             max_retries=3,
             timeout_minutes=10
@@ -645,6 +684,276 @@ AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attemp
 Begin execution now.
 """
         return prompt
+
+    def _generate_phase_prompts(
+        self,
+        user_request: str,
+        intent: Intent,
+        topic: Topic,
+        sub_plans: List[SubPlan],
+        browser_phases: List[BrowserPhase]
+    ) -> Dict[str, str]:
+        """
+        Generate focused prompts for each browser execution phase.
+
+        Each phase has a specific, limited scope:
+        - DISCOVERY: Find targets, collect URLs and names from search results
+        - EXTRACTION: Visit specific URLs and extract detailed data
+        - ACTION: Execute state-changing operations (add to cart, book, etc.)
+        - VERIFICATION: Confirm actions completed successfully
+        """
+        phase_prompts = {}
+
+        # Collect site knowledge from all plans
+        all_site_knowledge = {}
+        for plan in sub_plans:
+            if plan.site_knowledge:
+                all_site_knowledge[plan.agent_name] = plan.site_knowledge
+
+        site_knowledge_text = json.dumps(all_site_knowledge, indent=2) if all_site_knowledge else "Use standard navigation"
+
+        # Generate prompt for each phase
+        for phase in browser_phases:
+            if phase == BrowserPhase.DISCOVERY:
+                phase_prompts[phase.value] = self._generate_discovery_prompt(
+                    user_request, topic, site_knowledge_text
+                )
+            elif phase == BrowserPhase.EXTRACTION:
+                phase_prompts[phase.value] = self._generate_extraction_prompt(
+                    user_request, topic, site_knowledge_text
+                )
+            elif phase == BrowserPhase.ACTION:
+                phase_prompts[phase.value] = self._generate_action_prompt(
+                    user_request, topic, sub_plans, site_knowledge_text
+                )
+            elif phase == BrowserPhase.VERIFICATION:
+                phase_prompts[phase.value] = self._generate_verification_prompt(
+                    user_request, topic
+                )
+
+        return phase_prompts
+
+    def _generate_discovery_prompt(self, user_request: str, topic: Topic, site_knowledge: str) -> str:
+        """Generate prompt for the Discovery phase - find targets and collect basic info."""
+        topic_sites = {
+            Topic.FOOD: "Google Maps and Yelp",
+            Topic.TRAVEL: "Google Maps and TripAdvisor",
+            Topic.BOOKS: "Google and Goodreads",
+            Topic.TECH: "Google and Wirecutter",
+            Topic.PRODUCTS: "Google and Amazon",
+            Topic.LOCATION: "Google Maps",
+            Topic.GENERAL: "Google",
+        }
+
+        sites = topic_sites.get(topic, "Google")
+
+        return f"""
+=== DISCOVERY PHASE ===
+MISSION: Find relevant results for "{user_request}"
+
+YOUR ONLY GOAL: Search and collect a list of targets with their URLs.
+DO NOT click into individual results. DO NOT extract detailed information.
+
+SITES TO SEARCH: {sites}
+
+STEPS:
+1. Navigate to the appropriate search site
+2. Enter search query based on user request
+3. Wait for results to load
+4. Collect from the SEARCH RESULTS page:
+   - Names of top 3-5 relevant results
+   - URLs/links for each result
+   - Any visible ratings or basic info shown in the listing
+
+SITE KNOWLEDGE:
+{site_knowledge}
+
+=== OUTPUT FORMAT ===
+Provide a JSON list of discovered targets:
+```json
+{{
+  "targets": [
+    {{
+      "name": "Result Name",
+      "url": "https://...",
+      "basic_info": "Rating, price, etc. visible in listing"
+    }}
+  ],
+  "search_query_used": "what you searched for",
+  "source_site": "where you searched"
+}}
+```
+
+=== RULES ===
+✅ Stay on search results pages - do not click into individual results
+✅ Collect URLs exactly as shown
+✅ Get 3-5 results maximum
+✅ Use "done" action immediately when you have the list
+❌ DO NOT visit individual result pages
+❌ DO NOT try to get detailed info like hours, phone, reviews
+❌ DO NOT spend more than 5 browser actions on this phase
+"""
+
+    def _generate_extraction_prompt(self, user_request: str, topic: Topic, site_knowledge: str) -> str:
+        """Generate prompt for the Extraction phase - get detailed info from specific pages."""
+        topic_fields = {
+            Topic.FOOD: "hours, address, phone, rating, price range, cuisine type, popular dishes, reservation availability",
+            Topic.TRAVEL: "address, amenities, price range, availability, reviews summary, nearby attractions",
+            Topic.BOOKS: "author, publication date, rating, genre, description, price, format options",
+            Topic.TECH: "specifications, price, pros/cons, where to buy, rating",
+            Topic.PRODUCTS: "price, availability, rating, key features, seller info",
+            Topic.LOCATION: "address, hours, phone, busy times, parking, accessibility",
+            Topic.GENERAL: "relevant details based on the page content",
+        }
+
+        fields = topic_fields.get(topic, "all relevant details")
+
+        return f"""
+=== EXTRACTION PHASE ===
+MISSION: Extract detailed information for "{user_request}"
+
+YOU WILL RECEIVE: A list of target URLs from the Discovery phase.
+YOUR GOAL: Visit each URL and extract specific details.
+
+FIELDS TO EXTRACT: {fields}
+
+SITE KNOWLEDGE:
+{site_knowledge}
+
+=== EXECUTION ===
+For EACH target URL provided:
+1. Navigate directly to the URL
+2. Wait for page to load
+3. Extract the required fields
+4. Move to next URL
+
+NOTE: The target URLs will be provided as input when this phase runs.
+If no URLs are provided, search for the top result and extract from that.
+
+=== OUTPUT FORMAT ===
+```json
+{{
+  "extracted_data": [
+    {{
+      "name": "Business/Product Name",
+      "url": "https://...",
+      "address": "Full address",
+      "phone": "Phone number",
+      "hours": "Operating hours",
+      "rating": "X.X stars from N reviews",
+      "price_range": "$-$$$$",
+      "highlights": "Key notable features",
+      "additional_info": "Any other relevant details"
+    }}
+  ]
+}}
+```
+
+=== RULES ===
+✅ Go directly to provided URLs
+✅ Extract ALL available fields from each page
+✅ Be thorough - this is the main data collection phase
+✅ Use "done" when you've extracted from all targets
+❌ DO NOT search for new results (use provided URLs)
+❌ DO NOT take any actions (add to cart, book, etc.)
+❌ Limit to 3-5 targets maximum to avoid timeout
+"""
+
+    def _generate_action_prompt(
+        self,
+        user_request: str,
+        topic: Topic,
+        sub_plans: List[SubPlan],
+        site_knowledge: str
+    ) -> str:
+        """Generate prompt for the Action phase - execute state-changing operations."""
+        # Get action steps from action agent plans
+        action_steps = []
+        for plan in sub_plans:
+            if plan.agent_type == "action":
+                action_steps.extend(plan.steps)
+
+        steps_text = ""
+        for i, step in enumerate(action_steps[:10], 1):  # Limit to 10 steps
+            steps_text += f"{i}. {step.get('action', 'Execute step')}\n"
+            if step.get('expected_outcome'):
+                steps_text += f"   Expected: {step.get('expected_outcome')}\n"
+
+        if not steps_text:
+            steps_text = "Execute the requested action based on user request."
+
+        return f"""
+=== ACTION PHASE ===
+MISSION: Execute the action for "{user_request}"
+
+YOU WILL RECEIVE: Target information from the Extraction phase.
+YOUR GOAL: Complete the requested action (add to cart, make reservation, etc.)
+
+SITE KNOWLEDGE:
+{site_knowledge}
+
+=== ACTION STEPS ===
+{steps_text}
+
+=== OUTPUT FORMAT ===
+Confirm the action was completed:
+```json
+{{
+  "action_completed": true,
+  "action_type": "add_to_cart | reservation | purchase | etc.",
+  "target": "What was acted on",
+  "details": {{
+    "confirmation_number": "if provided",
+    "price": "if applicable",
+    "date_time": "if applicable"
+  }},
+  "notes": "Any relevant information"
+}}
+```
+
+=== RULES ===
+✅ Use the target information from previous phases
+✅ Complete the action fully
+✅ Capture confirmation details
+✅ Use "done" immediately after action completes
+❌ DO NOT search or browse - go directly to action
+❌ DO NOT over-engineer - just complete the requested action
+"""
+
+    def _generate_verification_prompt(self, user_request: str, topic: Topic) -> str:
+        """Generate prompt for the Verification phase - confirm action succeeded."""
+        return f"""
+=== VERIFICATION PHASE ===
+MISSION: Verify that the action for "{user_request}" completed successfully.
+
+YOUR GOAL: Confirm the action was successful and capture proof.
+
+=== VERIFICATION STEPS ===
+1. Check for confirmation message/page
+2. Verify the action result is visible (item in cart, reservation confirmed, etc.)
+3. Capture any confirmation numbers or details
+4. Take note of any warnings or issues
+
+=== OUTPUT FORMAT ===
+```json
+{{
+  "verified": true,
+  "evidence": "What confirms the action succeeded",
+  "confirmation_details": {{
+    "confirmation_number": "if available",
+    "summary": "what was completed"
+  }},
+  "issues": "any problems noticed, or null if none"
+}}
+```
+
+=== RULES ===
+✅ Navigate to where confirmation should be visible
+✅ Capture specific evidence of success
+✅ Use "done" immediately after verification
+❌ DO NOT take additional actions
+❌ DO NOT repeat the action
+"""
 
     def _get_output_format(self, intent: Intent, topic: Topic) -> str:
         """Get the appropriate output format for the task."""

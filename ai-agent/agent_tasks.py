@@ -15,8 +15,12 @@ Model Configuration:
 import os
 import sys
 import platform
+import json
+import re
+import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 import asyncio
 import logging
 
@@ -46,6 +50,30 @@ from browser_use.llm.models import ChatGoogle
 from agent_loader import AgentLoader, AgentProfile
 
 logger = logging.getLogger(__name__)
+
+
+# =====================================================
+# Phased Execution Data Structures
+# =====================================================
+
+@dataclass
+class PhaseResult:
+    """Result from a single browser phase execution."""
+    phase_name: str
+    status: str  # "success", "partial", "failed"
+    output: str  # Raw output from browser agent
+    parsed_data: Optional[Dict] = None  # Parsed JSON if available
+    error: Optional[str] = None
+    duration_seconds: float = 0.0
+
+
+@dataclass
+class PhasedExecutionResult:
+    """Aggregated result from all phases."""
+    overall_status: str  # "success", "partial", "failed"
+    phase_results: List[PhaseResult]
+    final_output: str  # Combined summary for user
+    total_duration_seconds: float = 0.0
 
 
 def get_browser_profile():
@@ -164,6 +192,50 @@ class AgentTaskRunner:
         # Add executor-specific enhancements
         final_prompt = self._add_executor_enhancements(enhanced_prompt)
         return await self._execute_browser_task(final_prompt)
+
+    async def run_phased(self, plan) -> Dict:
+        """
+        Run a task using phased browser execution (RECOMMENDED).
+
+        Instead of one long execution, breaks the task into focused phases:
+        - DISCOVERY: Find targets and URLs from search results
+        - EXTRACTION: Visit URLs and extract detailed data
+        - ACTION: Execute state-changing operations
+        - VERIFICATION: Confirm actions succeeded
+
+        Each phase runs in a separate browser session, which improves
+        reliability for complex tasks.
+
+        Args:
+            plan: UnifiedPlan from Orchestrator with browser_phases and phase_prompts
+
+        Returns:
+            Dict with status, result, and phase_details
+        """
+        # Check if plan has phased prompts
+        if not hasattr(plan, 'phase_prompts') or not plan.phase_prompts:
+            # Fall back to single-prompt execution
+            logger.warning("Plan missing phase_prompts, falling back to single execution")
+            return await self.run_with_prompt(plan.executor_prompt)
+
+        # Use the phased executor
+        phased_executor = PhasedBrowserExecutor()
+        result = await phased_executor.execute_phased(plan)
+
+        return {
+            "status": result.overall_status,
+            "result": result.final_output,
+            "phase_details": [
+                {
+                    "phase": pr.phase_name,
+                    "status": pr.status,
+                    "duration": pr.duration_seconds,
+                    "error": pr.error
+                }
+                for pr in result.phase_results
+            ],
+            "total_duration": result.total_duration_seconds
+        }
 
     async def _execute_browser_task(self, prompt: str) -> Dict:
         """
@@ -554,6 +626,302 @@ For EACH website:
 RECOMMENDATION:
 Best deal: [Site] at $X.XX
 """
+
+
+# =====================================================
+# Phased Browser Executor
+# =====================================================
+
+class PhasedBrowserExecutor:
+    """
+    Executes browser tasks in separate phases to improve reliability.
+
+    Instead of one long execution plan, tasks are split into:
+    1. DISCOVERY - Find targets, collect URLs from search results
+    2. EXTRACTION - Visit URLs and extract detailed data
+    3. ACTION - Execute state-changing operations
+    4. VERIFICATION - Confirm actions succeeded
+
+    Each phase runs in a separate browser session, passing data forward.
+    This prevents the browser agent from getting overwhelmed by long plans.
+    """
+
+    def __init__(self):
+        # Browser profile - auto-detects platform
+        self.browser_profile = get_browser_profile()
+        logger.info(f"PhasedBrowserExecutor initialized for: {os.getenv('BROWSER_TYPE', 'auto')}")
+
+        # LLM - Using Gemini 2.0 Flash for browser automation
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if api_key:
+            os.environ["GOOGLE_API_KEY"] = api_key
+        self.llm = ChatGoogle(model="gemini-2.0-flash")
+
+        # Load executor agent profile for enhancements
+        self.agent_loader = AgentLoader()
+        try:
+            self.executor_profile = self.agent_loader.load_agent("executor")
+        except FileNotFoundError:
+            self.executor_profile = None
+
+    async def execute_phased(self, plan) -> PhasedExecutionResult:
+        """
+        Execute a UnifiedPlan using phased browser execution.
+
+        Args:
+            plan: UnifiedPlan from Orchestrator with phase_prompts
+
+        Returns:
+            PhasedExecutionResult with all phase outputs
+        """
+        phase_results = []
+        total_start = time.time()
+
+        # Data passed between phases
+        context_data = {}
+
+        # Execute each phase in order
+        for phase in plan.browser_phases:
+            phase_name = phase.value
+            logger.info(f"Starting browser phase: {phase_name}")
+
+            # Get the prompt for this phase
+            base_prompt = plan.phase_prompts.get(phase_name, "")
+            if not base_prompt:
+                logger.warning(f"No prompt found for phase: {phase_name}")
+                continue
+
+            # Inject context from previous phases
+            prompt_with_context = self._inject_context(base_prompt, phase_name, context_data)
+
+            # Execute the phase
+            phase_result = await self._execute_single_phase(phase_name, prompt_with_context)
+            phase_results.append(phase_result)
+
+            # Extract data for next phases
+            if phase_result.status == "success" and phase_result.parsed_data:
+                context_data[phase_name] = phase_result.parsed_data
+
+            # For failed phases, decide whether to continue
+            if phase_result.status == "failed":
+                logger.warning(f"Phase {phase_name} failed, checking if we should continue...")
+                # For research phases, we can continue without all data
+                # For action phases, failure usually means we should stop
+                if phase_name in ["action", "verification"]:
+                    logger.error(f"Critical phase {phase_name} failed, stopping execution")
+                    break
+
+        # Calculate total duration
+        total_duration = time.time() - total_start
+
+        # Determine overall status
+        success_count = sum(1 for r in phase_results if r.status == "success")
+        total_count = len(phase_results)
+
+        if success_count == total_count:
+            overall_status = "success"
+        elif success_count > 0:
+            overall_status = "partial"
+        else:
+            overall_status = "failed"
+
+        # Generate final combined output
+        final_output = self._combine_phase_outputs(phase_results, plan.original_request)
+
+        return PhasedExecutionResult(
+            overall_status=overall_status,
+            phase_results=phase_results,
+            final_output=final_output,
+            total_duration_seconds=total_duration
+        )
+
+    async def _execute_single_phase(self, phase_name: str, prompt: str) -> PhaseResult:
+        """Execute a single phase in a new browser session."""
+        start_time = time.time()
+
+        try:
+            # Create fresh browser session for this phase
+            browser_session = BrowserSession(
+                browser_profile=self.browser_profile,
+                headless=False,
+            )
+
+            agent = Agent(
+                task=prompt,
+                llm=self.llm,
+                browser_session=browser_session,
+            )
+
+            logger.info(f"Executing phase: {phase_name}")
+            result = await agent.run()
+
+            # Extract the output
+            raw_output = self._extract_result(result)
+            duration = time.time() - start_time
+
+            # Try to parse JSON from output
+            parsed_data = self._try_parse_json(raw_output)
+
+            logger.info(f"Phase {phase_name} completed in {duration:.1f}s")
+
+            return PhaseResult(
+                phase_name=phase_name,
+                status="success",
+                output=raw_output,
+                parsed_data=parsed_data,
+                duration_seconds=duration
+            )
+
+        except Exception as e:
+            duration = time.time() - start_time
+            logger.error(f"Phase {phase_name} failed after {duration:.1f}s: {e}")
+
+            return PhaseResult(
+                phase_name=phase_name,
+                status="failed",
+                output="",
+                error=str(e),
+                duration_seconds=duration
+            )
+
+    def _inject_context(self, prompt: str, current_phase: str, context_data: Dict) -> str:
+        """Inject data from previous phases into the current prompt."""
+        context_section = ""
+
+        if current_phase == "extraction" and "discovery" in context_data:
+            # Inject discovered URLs into extraction prompt
+            discovery_data = context_data["discovery"]
+            targets = discovery_data.get("targets", [])
+
+            if targets:
+                context_section = "\n=== TARGETS FROM DISCOVERY ===\n"
+                for i, target in enumerate(targets, 1):
+                    name = target.get("name", "Unknown")
+                    url = target.get("url", "")
+                    info = target.get("basic_info", "")
+                    context_section += f"{i}. {name}\n   URL: {url}\n   Info: {info}\n\n"
+
+        elif current_phase == "action" and "extraction" in context_data:
+            # Inject extracted data into action prompt
+            extraction_data = context_data["extraction"]
+            extracted = extraction_data.get("extracted_data", [])
+
+            if extracted:
+                context_section = "\n=== DATA FROM EXTRACTION ===\n"
+                # Use the first/best result for action
+                if len(extracted) > 0:
+                    best = extracted[0]
+                    context_section += f"Target: {best.get('name', 'Unknown')}\n"
+                    context_section += f"URL: {best.get('url', '')}\n"
+                    for key, value in best.items():
+                        if key not in ["name", "url"] and value:
+                            context_section += f"{key.title()}: {value}\n"
+
+        elif current_phase == "verification" and "action" in context_data:
+            # Inject action results into verification prompt
+            action_data = context_data["action"]
+            context_section = "\n=== ACTION RESULT TO VERIFY ===\n"
+            context_section += f"Action completed: {action_data.get('action_completed', 'unknown')}\n"
+            context_section += f"Target: {action_data.get('target', 'unknown')}\n"
+
+        # Insert context at the beginning of the prompt
+        if context_section:
+            return context_section + "\n" + prompt
+
+        return prompt
+
+    def _extract_result(self, agent_history) -> str:
+        """Extract clean result from browser agent output."""
+        try:
+            if hasattr(agent_history, 'all_results'):
+                for action_result in reversed(agent_history.all_results):
+                    if action_result.is_done and action_result.extracted_content:
+                        return action_result.extracted_content
+
+            if hasattr(agent_history, 'final_result'):
+                return str(agent_history.final_result())
+
+            return "Phase completed."
+
+        except Exception as e:
+            logger.warning(f"Could not extract result: {e}")
+            return "Phase completed."
+
+    def _try_parse_json(self, text: str) -> Optional[Dict]:
+        """Try to extract and parse JSON from the output text."""
+        if not text:
+            return None
+
+        # Look for JSON in code blocks
+        json_match = re.search(r'```(?:json)?\s*\n?([\s\S]*?)\n?```', text)
+        if json_match:
+            try:
+                return json.loads(json_match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # Try to find raw JSON object
+        json_obj_match = re.search(r'\{[\s\S]*\}', text)
+        if json_obj_match:
+            try:
+                return json.loads(json_obj_match.group())
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    def _combine_phase_outputs(self, phase_results: List[PhaseResult], original_request: str) -> str:
+        """Combine outputs from all phases into a user-friendly summary."""
+        output_parts = []
+        output_parts.append(f"Results for: {original_request}\n")
+
+        for result in phase_results:
+            if result.status == "success":
+                if result.parsed_data:
+                    # Format the parsed data nicely
+                    output_parts.append(self._format_parsed_data(result.phase_name, result.parsed_data))
+                else:
+                    output_parts.append(f"**{result.phase_name.title()}:** {result.output[:500]}")
+            elif result.status == "failed":
+                output_parts.append(f"**{result.phase_name.title()}:** Failed - {result.error or 'Unknown error'}")
+
+        return "\n\n".join(output_parts)
+
+    def _format_parsed_data(self, phase_name: str, data: Dict) -> str:
+        """Format parsed phase data for user display."""
+        if phase_name == "discovery":
+            targets = data.get("targets", [])
+            if targets:
+                lines = [f"**Found {len(targets)} results:**"]
+                for t in targets[:5]:
+                    lines.append(f"• {t.get('name', 'Unknown')} - {t.get('basic_info', '')}")
+                return "\n".join(lines)
+
+        elif phase_name == "extraction":
+            extracted = data.get("extracted_data", [])
+            if extracted:
+                lines = ["**Detailed Information:**"]
+                for item in extracted[:5]:
+                    lines.append(f"\n• **{item.get('name', 'Unknown')}**")
+                    for key, value in item.items():
+                        if key != "name" and value:
+                            lines.append(f"  - {key.title()}: {value}")
+                return "\n".join(lines)
+
+        elif phase_name == "action":
+            if data.get("action_completed"):
+                return f"✅ Action completed: {data.get('target', 'Unknown')}"
+            else:
+                return "❌ Action was not completed"
+
+        elif phase_name == "verification":
+            if data.get("verified"):
+                return f"✅ Verified: {data.get('evidence', 'Action confirmed')}"
+            else:
+                return f"⚠️ Verification issue: {data.get('issues', 'Could not confirm')}"
+
+        # Default: just dump as formatted JSON
+        return json.dumps(data, indent=2)
 
 
 # =====================================================
