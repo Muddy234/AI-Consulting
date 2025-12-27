@@ -27,11 +27,15 @@ from dotenv import load_dotenv
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent.resolve()
-ENV_FILE = SCRIPT_DIR / ".env"
+PROJECT_DIR = SCRIPT_DIR.parent  # ai-agent root
+ENV_FILE = PROJECT_DIR / ".env"
+
+# Add project root to path for imports
+sys.path.insert(0, str(PROJECT_DIR))
 
 print(f"📂 Looking for .env at: {ENV_FILE}")
 
-# Load .env from the script's directory
+# Load .env from the project directory
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
     print(f"✅ Loaded .env file successfully!")
@@ -57,9 +61,9 @@ if sys.platform == 'win32':
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
-# Import our task runner and planner
-from agent_tasks import AgentTaskRunner
-from task_planner import TaskPlanner, TaskType, plan_and_describe
+# Import our task runner and planner from core package
+from core.agent_tasks import AgentTaskRunner
+from core.task_planner import TaskPlanner, TaskType, plan_and_describe
 
 # ================= CONFIGURATION =================
 class Config:
@@ -78,7 +82,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('telegram_bot.log'),
+        logging.FileHandler(PROJECT_DIR / 'logs' / 'telegram_bot.log'),
         logging.StreamHandler()
     ]
 )

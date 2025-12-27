@@ -11,6 +11,11 @@ import logging
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Optional
+from pathlib import Path
+
+# Setup paths
+SCRIPT_DIR = Path(__file__).parent.resolve()
+PROJECT_DIR = SCRIPT_DIR.parent  # ai-agent root
 
 # Fix Windows console encoding for special characters
 if sys.platform == 'win32':
@@ -27,7 +32,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler('outlook_sync.log'),
+        logging.FileHandler(PROJECT_DIR / 'logs' / 'outlook_sync.log'),
         logging.StreamHandler()
     ]
 )

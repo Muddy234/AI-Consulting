@@ -5,23 +5,32 @@ Flask-based web interface for managing AI tasks.
 """
 
 import os
+import sys
 import asyncio
 import json
 import threading
 from datetime import datetime
 from functools import wraps
+from pathlib import Path
+
+# Setup paths for imports
+SCRIPT_DIR = Path(__file__).parent.resolve()
+PROJECT_DIR = SCRIPT_DIR.parent  # ai-agent root
+sys.path.insert(0, str(PROJECT_DIR))
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_socketio import SocketIO, emit
 
-from task_executor import (
+from core.task_executor import (
     TaskExecutor, Task, TaskType, TaskStatus,
     CommandParser, create_email_task, create_calendar_task
 )
-from outlook_sync import OutlookStateSync, Config
+from interfaces.outlook_sync import OutlookStateSync, Config
 
 # ================= APP SETUP =================
-app = Flask(__name__)
+app = Flask(__name__,
+            template_folder=str(PROJECT_DIR / 'templates'),
+            static_folder=str(PROJECT_DIR / 'static'))
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
 
 # SocketIO for real-time updates

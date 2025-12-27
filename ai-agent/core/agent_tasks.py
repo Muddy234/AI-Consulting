@@ -30,9 +30,10 @@ from dotenv import load_dotenv
 
 # Get the directory where this script is located
 SCRIPT_DIR = Path(__file__).parent.resolve()
-ENV_FILE = SCRIPT_DIR / ".env"
+PROJECT_DIR = SCRIPT_DIR.parent  # ai-agent root
+ENV_FILE = PROJECT_DIR / ".env"
 
-# Load .env from the script's directory
+# Load .env from the project directory
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
 else:
@@ -47,7 +48,7 @@ from browser_use import Agent, BrowserProfile, BrowserSession
 from browser_use.llm.models import ChatGoogle
 
 # Import agent system
-from agent_loader import AgentLoader, AgentProfile
+from .agent_loader import AgentLoader, AgentProfile
 
 logger = logging.getLogger(__name__)
 

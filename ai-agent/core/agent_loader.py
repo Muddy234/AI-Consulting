@@ -22,8 +22,9 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-# Base path for agent definitions
-AGENTS_DIR = Path(__file__).parent / "agents"
+# Base path for agent definitions (in project root)
+PROJECT_DIR = Path(__file__).parent.parent
+AGENTS_DIR = PROJECT_DIR / "agents"
 
 
 @dataclass

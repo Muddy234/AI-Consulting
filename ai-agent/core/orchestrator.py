@@ -27,7 +27,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-ENV_FILE = SCRIPT_DIR / ".env"
+PROJECT_DIR = SCRIPT_DIR.parent  # ai-agent root
+ENV_FILE = PROJECT_DIR / ".env"
 
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
@@ -41,7 +42,7 @@ if sys.platform == 'win32':
 
 import google.generativeai as genai
 
-from agent_loader import AgentLoader, AgentProfile
+from .agent_loader import AgentLoader, AgentProfile
 
 logger = logging.getLogger(__name__)
 
