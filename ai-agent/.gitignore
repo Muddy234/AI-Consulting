@@ -1,17 +1,51 @@
-# Sensitive files - NEVER commit these
-ai-agent/.env
+# ========================================
+# Sensitive files - NEVER commit
+# ========================================
 .env
+*.env
+!.env.example
 
-# Cache files
-ai-agent/__pycache__/
+# ========================================
+# Python
+# ========================================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
+# ========================================
 # Logs
+# ========================================
+logs/*.log
 *.log
-ai-agent/telegram_bot.log
 
-# Example/template files (safe to commit)
-# ai-agent/.env.example
-ai-agent/.env
-ai-agent/.env
+# ========================================
+# IDE / Editor
+# ========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========================================
+# OS
+# ========================================
+.DS_Store
+Thumbs.db
