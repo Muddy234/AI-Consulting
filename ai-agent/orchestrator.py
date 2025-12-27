@@ -651,49 +651,101 @@ Begin execution now.
         formats = {
             (Intent.ACTION, Topic.PRODUCTS): """
 === OUTPUT FORMAT ===
-Confirm the action:
+Confirm the action with relevant details:
 ✅ [Action completed] - [Item name]
    Price: $X.XX
    Status: Added to cart / Purchased / Failed
+   Any relevant notes (shipping, seller, etc.)
 """,
             (Intent.ACTION, Topic.BOOKS): """
 === OUTPUT FORMAT ===
-Confirm the action:
+Confirm the action with relevant details:
 ✅ [Action completed] - [Book title] by [Author]
    Format: Kindle / Paperback / etc.
    Price: $X.XX
+   Any relevant notes
 """,
             (Intent.ACTION, Topic.FOOD): """
 === OUTPUT FORMAT ===
-Confirm the reservation:
+Confirm the reservation with all relevant details:
 ✅ Reservation confirmed
    Restaurant: [Name]
+   Address: [Full address]
    Date/Time: [Details]
    Party size: [Number]
    Confirmation #: [If provided]
+   Any special notes or instructions
 """,
             (Intent.ACTION, Topic.EMAIL): """
 === OUTPUT FORMAT ===
-Confirm sync complete:
+Confirm sync complete with summary:
 ✅ Email sync complete
    - [X] flagged emails processed
    - Calendar event created for [date]
-   - Key items: [Brief list]
+   - Key items summary
 """,
             (Intent.RESEARCH, Topic.FOOD): """
 === OUTPUT FORMAT ===
-• **[Restaurant Name]** - [Cuisine], [Neighborhood]
-  [Rating] stars | [Price range] | [1 sentence highlight]
+For each restaurant/venue, provide:
+• **[Name]** - [Cuisine type], [Location/Neighborhood]
+  - Rating: [X.X stars] from [N reviews]
+  - Price range: [$-$$$$]
+  - Address: [Full address]
+  - Hours: [Today's hours or general hours]
+  - Highlights: [What makes it notable - signature dishes, atmosphere, etc.]
+  - Any relevant notes (reservations needed, parking, etc.)
+
+Include enough detail to make an informed decision.
 """,
             (Intent.RESEARCH, Topic.BOOKS): """
 === OUTPUT FORMAT ===
+For each book, provide:
 • **[Book Title]** by [Author]
-  [1-2 sentences: genre, what it's about, why recommended]
+  - Genre/Category
+  - Brief description of what it's about
+  - Why it's recommended or notable
+  - Price/availability if relevant
+
+Include enough detail to decide if it's worth reading.
 """,
             (Intent.RESEARCH, Topic.TECH): """
 === OUTPUT FORMAT ===
+For each product, provide:
 • **[Product Name]** - $[Price]
-  [Key specs] | [1 sentence on pros/cons]
+  - Key specifications
+  - Pros and cons
+  - Where to buy / availability
+  - Any notable reviews or ratings
+
+Include enough detail to compare options.
+""",
+            (Intent.RESEARCH, Topic.LOCATION): """
+=== OUTPUT FORMAT ===
+For each location/business, provide:
+• **[Business Name]**
+  - Address: [Full address]
+  - Phone: [Number]
+  - Hours: [Operating hours, note if currently open/closed]
+  - Description: [What the business offers/does]
+  - Rating: [If available]
+  - Busy times: [If available - best times to visit]
+  - Parking/Access: [If relevant]
+  - Any other relevant details for planning a visit
+
+Include enough information to plan a visit or contact them.
+""",
+            (Intent.RESEARCH, Topic.TRAVEL): """
+=== OUTPUT FORMAT ===
+For each destination/accommodation, provide:
+• **[Name]**
+  - Location: [Address/Area]
+  - Description: [What it offers]
+  - Rating: [If available]
+  - Price range: [If applicable]
+  - Highlights: [Key features, amenities, attractions]
+  - Tips: [Best time to visit, things to know]
+
+Include enough detail to plan accordingly.
 """,
         }
 
@@ -701,12 +753,17 @@ Confirm sync complete:
         if key in formats:
             return formats[key]
 
-        # Default format
+        # Default format - more flexible
         return """
 === OUTPUT FORMAT ===
-Provide a concise summary of what was accomplished.
-Use bullet points for multiple items.
-Keep response SHORT and actionable.
+Provide a comprehensive summary organized with bullet points.
+Include all relevant details the user needs to make informed decisions or take action.
+Structure the response clearly with:
+• Key findings or results
+• Important details for each item
+• Any relevant notes, warnings, or recommendations
+
+Be thorough but organized - quality over brevity.
 """
 
     def _estimate_duration(self, phases: List[Dict]) -> str:
