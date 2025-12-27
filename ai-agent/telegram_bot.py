@@ -148,6 +148,15 @@ class AIAgentBot:
 
     def _format_plan_summary(self, plan) -> str:
         """Format a plan into a readable summary for Telegram."""
+        # Show agents being used (from new orchestrator)
+        agents_text = ""
+        if plan.unified_plan and plan.unified_plan.agents_used:
+            agents_list = ", ".join(plan.unified_plan.agents_used)
+            agents_text = f"\n**Agents:** {agents_list}"
+            intent_topic = f" ({plan.unified_plan.intent.value} / {plan.unified_plan.topic.value})"
+        else:
+            intent_topic = ""
+
         steps_text = "\n".join([f"  {s.step_number}. {s.action}" for s in plan.steps[:5]])
         if len(plan.steps) > 5:
             steps_text += f"\n  ... and {len(plan.steps) - 5} more steps"
@@ -160,9 +169,9 @@ class AIAgentBot:
             if top_issues:
                 issues_text = "\n\n⚠️ **Watching for:**\n" + "\n".join([f"  • {i.issue}" for i in top_issues])
 
-        return f"""📋 **Task Plan** (ID: {plan.task_id})
+        return f"""📋 **Task Plan** (ID: {plan.task_id}){intent_topic}
 
-**Goal:** {plan.interpreted_goal}
+**Goal:** {plan.interpreted_goal}{agents_text}
 
 **Steps:**
 {steps_text}

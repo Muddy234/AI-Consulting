@@ -1,8 +1,11 @@
 """
-Agent Tasks - Modular Task System for Browser Automation
-=========================================================
-Add new capabilities by creating task templates.
+Agent Tasks - Browser Automation Executor
+==========================================
+Executes browser automation tasks using the Executor agent profile.
+Integrates with the Orchestrator for enhanced prompt generation.
+
 Supports both Windows (Edge) and Raspberry Pi (Chromium).
+Uses Gemini 2.0 Flash for all operations.
 """
 
 import os
@@ -34,6 +37,9 @@ if sys.platform == 'win32':
 
 from browser_use import Agent, BrowserProfile, BrowserSession
 from browser_use.llm.models import ChatGoogle
+
+# Import agent system
+from agent_loader import AgentLoader, AgentProfile
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +81,19 @@ def get_browser_profile():
 
 class AgentTaskRunner:
     """
-    Universal task runner that can execute various browser automation tasks.
+    Universal task runner that executes browser automation tasks.
 
-    Key Design Principles (Lessons Learned):
+    Uses the Executor agent profile for:
+    - Self-correction and recovery
+    - Verification signals
+    - Stuck detection and fallback
+
+    Key Design Principles:
     1. Use existing browser sessions (no login attempts)
-    2. Break tasks into explicit numbered steps
-    3. Tell agent to READ content, not just skim
-    4. Consolidate output into structured formats
-    5. Always include update-vs-create logic
+    2. Follow structured execution phases
+    3. Verify each step before proceeding
+    4. Self-correct when stuck
+    5. Report clear results
     """
 
     def __init__(self):
@@ -90,14 +101,23 @@ class AgentTaskRunner:
         self.browser_profile = get_browser_profile()
         logger.info(f"Browser profile configured for: {os.getenv('BROWSER_TYPE', 'auto')}")
 
-        # LLM
+        # LLM - Using Gemini 2.0 Flash
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             os.environ["GOOGLE_API_KEY"] = api_key
         self.llm = ChatGoogle(model="gemini-2.0-flash")
 
+        # Load executor agent profile
+        self.agent_loader = AgentLoader()
+        try:
+            self.executor_profile = self.agent_loader.load_agent("executor")
+            logger.info("Loaded executor agent profile")
+        except FileNotFoundError:
+            logger.warning("Executor profile not found, using defaults")
+            self.executor_profile = None
+
     async def run_task(self, task_name: str, **params) -> Dict:
-        """Run a named task with parameters."""
+        """Run a named task with parameters (backward compatibility)."""
 
         # Get the task prompt
         task_generators = {
@@ -113,6 +133,42 @@ class AgentTaskRunner:
 
         prompt = task_generators[task_name](**params)
 
+        # Enhance with executor profile context
+        enhanced_prompt = self._enhance_with_executor_profile(prompt)
+
+        return await self._execute_browser_task(enhanced_prompt)
+
+    async def run_with_prompt(self, enhanced_prompt: str) -> Dict:
+        """
+        Run a task with an AI-generated enhanced prompt.
+        Used by the TaskPlanner/Orchestrator integration.
+
+        The prompt should already include:
+        - Site knowledge
+        - Execution steps
+        - Verification checkpoints
+        - Success criteria
+
+        Args:
+            enhanced_prompt: The detailed prompt from Orchestrator
+
+        Returns:
+            Dict with status and result
+        """
+        # Add executor-specific enhancements
+        final_prompt = self._add_executor_enhancements(enhanced_prompt)
+        return await self._execute_browser_task(final_prompt)
+
+    async def _execute_browser_task(self, prompt: str) -> Dict:
+        """
+        Execute a browser automation task.
+
+        Args:
+            prompt: The complete execution prompt
+
+        Returns:
+            Dict with status and result
+        """
         try:
             # Create browser session
             browser_session = BrowserSession(
@@ -125,49 +181,84 @@ class AgentTaskRunner:
                 llm=self.llm,
                 browser_session=browser_session,
             )
+
             result = await agent.run()
 
-            # Extract clean final result from AgentHistoryList
+            # Extract clean final result
             clean_result = self._extract_final_result(result)
             return {"status": "success", "result": clean_result}
+
         except Exception as e:
+            logger.error(f"Browser task failed: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def run_with_prompt(self, enhanced_prompt: str) -> Dict:
+    def _enhance_with_executor_profile(self, base_prompt: str) -> str:
+        """Add executor profile context to a base prompt."""
+        if not self.executor_profile:
+            return base_prompt
+
+        # Add self-correction rules from profile
+        self_correction = ""
+        if self.executor_profile.self_correction:
+            self_correction = "\n=== SELF-CORRECTION RULES ===\n"
+            for scenario, steps in self.executor_profile.self_correction.items():
+                self_correction += f"\n{scenario.upper()}:\n"
+                if isinstance(steps, list):
+                    for step in steps:
+                        self_correction += f"  - {step}\n"
+                else:
+                    self_correction += f"  {steps}\n"
+
+        # Add verification signals
+        verification = ""
+        if self.executor_profile.verification_signals:
+            verification = "\n=== VERIFICATION SIGNALS ===\n"
+            for category, signals in self.executor_profile.verification_signals.items():
+                if isinstance(signals, list):
+                    verification += f"\n{category}:\n"
+                    for signal in signals:
+                        if isinstance(signal, dict):
+                            verification += f"  - {signal}\n"
+
+        return f"""
+{base_prompt}
+
+{self_correction}
+
+{verification}
+
+=== BEHAVIORAL RULES ===
+DO:
+{chr(10).join(['- ' + rule for rule in self.executor_profile.behavioral_rules.get('do', [])])}
+
+DON'T:
+{chr(10).join(['- ' + rule for rule in self.executor_profile.behavioral_rules.get('dont', [])])}
+"""
+
+    def _add_executor_enhancements(self, prompt: str) -> str:
         """
-        Run a task with an AI-generated enhanced prompt.
-        Used by the TaskPlanner integration for smarter execution.
-
-        Args:
-            enhanced_prompt: The detailed prompt generated by TaskPlanner
-
-        Returns:
-            Dict with status and result
+        Add executor-specific enhancements to an orchestrator-generated prompt.
+        These are lightweight additions that don't duplicate what's in the prompt.
         """
-        try:
-            # Create browser session with extended timeout (90 seconds for browser start)
-            browser_session = BrowserSession(
-                browser_profile=self.browser_profile,
-                headless=False,
-            )
+        # Only add stuck detection if not already present
+        if "stuck" not in prompt.lower():
+            stuck_detection = """
 
-            agent = Agent(
-                task=enhanced_prompt,
-                llm=self.llm,
-                browser_session=browser_session,
-            )
-            result = await agent.run()
+=== STUCK DETECTION ===
+If you perform the same action 3 times without progress:
+1. STOP and re-evaluate the page state
+2. Check if page has fully loaded
+3. Try an alternative approach (different selector, scroll, refresh)
+4. If still stuck after 5 attempts, report the issue and move on
+"""
+            prompt += stuck_detection
 
-            # Extract clean final result from AgentHistoryList
-            clean_result = self._extract_final_result(result)
-            return {"status": "success", "result": clean_result}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+        return prompt
 
     def _extract_final_result(self, agent_history) -> str:
         """
         Extract a clean, human-readable result from the AgentHistoryList.
-        Returns only the final extracted content, not the full history.
+        Returns only the final extracted content.
         """
         try:
             # Look for the final done result with extracted_content
@@ -180,15 +271,17 @@ class AgentTaskRunner:
             if hasattr(agent_history, 'final_result'):
                 return str(agent_history.final_result())
 
-            # Last resort: return a summarized version
+            # Last resort
             return "Task completed. Check browser for results."
+
         except Exception as e:
             logger.warning(f"Could not extract clean result: {e}")
             return "Task completed."
 
     # =====================================================
-    # TASK: Email To-Do List (already implemented)
+    # Task Templates (backward compatibility)
     # =====================================================
+
     def _email_todo_task(self, inboxes: list = None, **kwargs) -> str:
         """Generate prompt for email to-do list sync."""
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%A, %B %d, %Y")
@@ -203,8 +296,7 @@ class AgentTaskRunner:
         return f"""
 MISSION: Create a SINGLE consolidated "To-Do List" calendar event with ALL flagged emails.
 
-AUTHENTICATION: You are using my pre-authenticated Edge browser. I am ALREADY LOGGED IN.
-DO NOT attempt to log in or enter any credentials.
+AUTHENTICATION: You are using my pre-authenticated browser. DO NOT attempt to log in.
 
 INBOXES TO CHECK:
 {inbox_list}
@@ -234,20 +326,15 @@ Event details:
 - Duration: 30 minutes
 
 Description format:
-1) [Sender] - [Subject]
-   - Summary: [What this email is about]
-   - Recommended Action: [What to do]
+□ [Action] (from: [Sender]) - [Deadline if mentioned]
 
-=== RULES ===
-✅ ONE event with ALL flagged emails
-✅ READ each email fully
-✅ Update existing event if present
-❌ No placeholder text
+=== OUTPUT FORMAT ===
+✅ Email sync complete
+   - [X] flagged emails processed
+   - Calendar event created for {tomorrow}
+   - Key items: [Brief list of actions]
 """
 
-    # =====================================================
-    # TASK: Amazon Purchase
-    # =====================================================
     def _amazon_purchase_task(self,
                                item_description: str,
                                max_price: float = None,
@@ -262,8 +349,7 @@ Description format:
         return f"""
 MISSION: Find and {action.lower()} an item on Amazon.
 
-AUTHENTICATION: You are using my pre-authenticated Edge browser. I am ALREADY LOGGED IN to Amazon.
-DO NOT attempt to log in or enter any credentials.
+AUTHENTICATION: You are using my pre-authenticated browser. DO NOT attempt to log in.
 
 ITEM TO FIND:
 - Description: {item_description}
@@ -273,7 +359,7 @@ ITEM TO FIND:
 === PHASE 1: SEARCH FOR ITEM ===
 
 1. Go to: https://www.amazon.com
-2. Wait 3 seconds for page to load
+2. Wait for page to load
 3. Click on the search box
 4. Type: "{item_description}"
 5. Press Enter or click the search button
@@ -281,41 +367,31 @@ ITEM TO FIND:
 
 === PHASE 2: SELECT BEST OPTION ===
 
-1. Review the search results carefully
+1. Review the search results
 2. Look for items that match the description
-3. Check the following for each potential match:
+3. Check:
    - Price (must be under ${max_price if max_price else 'any amount'})
    - Rating (prefer 4+ stars)
    - Reviews (prefer items with many reviews)
    - Prime eligibility (prefer Prime items)
-   - Seller reputation
-4. Click on the BEST matching item to view details
+4. Click on the BEST matching item
 5. READ the product description to confirm it matches
 
 === PHASE 3: {action} ===
 
 1. Select quantity: {quantity}
-2. Click "Add to Cart" button
-{"3. Verify item was added to cart" if add_to_cart_only else "3. Proceed to checkout and complete purchase"}
+2. UNCHECK "Subscribe & Save" if pre-selected
+3. Click "Add to Cart" button
+4. Dismiss any upsell popups (click "No thanks" or close)
+5. Verify "Added to Cart" message appears
 
-=== RULES ===
-✅ Search thoroughly before selecting
-✅ READ product details to confirm match
-✅ Check price before adding to cart
-{"✅ STOP after adding to cart - do not purchase" if add_to_cart_only else "✅ Complete the purchase"}
-❌ DO NOT add wrong items
-❌ DO NOT exceed price limit
-
-=== FINAL REPORT ===
-Report:
-- Item found: [name and price]
-- Why selected: [reasoning]
-- Action taken: [added to cart / purchased / not found]
+=== OUTPUT FORMAT ===
+✅ Added to cart - [Item name]
+   Price: $X.XX
+   Format/Variant: [If applicable]
+   Prime: Yes/No
 """
 
-    # =====================================================
-    # TASK: OpenTable Reservation
-    # =====================================================
     def _opentable_reservation_task(self,
                                      restaurant_name: str = None,
                                      cuisine_type: str = None,
@@ -333,11 +409,10 @@ Report:
         return f"""
 MISSION: Book a restaurant reservation on OpenTable.
 
-AUTHENTICATION: You are using my pre-authenticated Edge browser. I am ALREADY LOGGED IN to OpenTable.
-DO NOT attempt to log in or enter any credentials.
+AUTHENTICATION: You are using my pre-authenticated browser. DO NOT attempt to log in.
 
 RESERVATION DETAILS:
-- {"Restaurant: " + restaurant_name if restaurant_name else "Search for: " + cuisine_type + " in " + location}
+- {"Restaurant: " + restaurant_name if restaurant_name else "Search for: " + str(cuisine_type) + " in " + str(location)}
 - Date: {reservation_date}
 - Time: {reservation_time}
 - Party size: {party_size} people
@@ -345,7 +420,7 @@ RESERVATION DETAILS:
 === PHASE 1: FIND RESTAURANT ===
 
 1. Go to: https://www.opentable.com
-2. Wait 3 seconds for page to load
+2. Wait for page to load
 3. In the search box, type: "{search_query}"
 4. Set the date to: {reservation_date}
 5. Set the time to: {reservation_time}
@@ -356,41 +431,28 @@ RESERVATION DETAILS:
 === PHASE 2: SELECT RESTAURANT ===
 
 1. Review available restaurants
-2. Check for each option:
-   - Rating and reviews
-   - Available time slots near {reservation_time}
-   - Price range
-   - Distance from {location if location else 'desired location'}
+2. Check ratings and availability
 3. Click on the best matching restaurant
-4. READ the restaurant details and reviews
+4. Verify it has availability for requested time
 
 === PHASE 3: BOOK RESERVATION ===
 
 1. Select an available time slot closest to {reservation_time}
 2. Confirm party size is {party_size}
 3. Click to proceed with reservation
-4. Fill in any required details (use saved profile info)
+4. Fill in any required details
 5. Complete the reservation
 
-=== RULES ===
-✅ Find availability for the requested date/time
-✅ READ restaurant reviews before booking
-✅ Confirm all details before completing
-❌ DO NOT book if no suitable time available
-❌ DO NOT book wrong party size
+=== OUTPUT FORMAT ===
+✅ Reservation confirmed
+   Restaurant: [Name]
+   Date/Time: {reservation_date} at [Time booked]
+   Party size: {party_size} guests
+   Confirmation #: [If provided]
 
-=== FINAL REPORT ===
-Report:
-- Restaurant booked: [name]
-- Date/Time: [confirmation]
-- Party size: [number]
-- Confirmation number: [if provided]
-- Or: Why reservation could not be made
+   Address: [Restaurant address]
 """
 
-    # =====================================================
-    # TASK: Web Research
-    # =====================================================
     def _web_research_task(self,
                            topic: str,
                            questions: list = None,
@@ -403,10 +465,9 @@ Report:
             questions_text = "\nSpecific questions to answer:\n" + "\n".join([f"- {q}" for q in questions])
 
         return f"""
-MISSION: Research a topic and compile findings into a structured report.
+MISSION: Research a topic and compile findings.
 
-AUTHENTICATION: You are using my pre-authenticated Edge browser.
-DO NOT attempt to log in to any sites.
+AUTHENTICATION: You are using my pre-authenticated browser.
 
 RESEARCH TOPIC: {topic}
 {questions_text}
@@ -416,47 +477,34 @@ RESEARCH TOPIC: {topic}
 1. Go to: https://www.google.com
 2. Search for: "{topic}"
 3. Review the search results
-4. Identify the {num_sources} most relevant and authoritative sources
+4. Identify the {num_sources} most relevant sources
 
 === PHASE 2: GATHER INFORMATION ===
 
-For each of the {num_sources} sources:
+For each source:
 1. Click to open the source
-2. READ the content thoroughly (not just headlines)
-3. Note key facts, statistics, and insights
-4. Note the source URL for citation
-5. Go back and proceed to next source
+2. READ the content thoroughly
+3. Note key facts and insights
+4. Note the source URL
+5. Go back for next source
 
-=== PHASE 3: COMPILE REPORT ===
+=== PHASE 3: COMPILE FINDINGS ===
 
-Create a structured report with:
+Create a structured summary.
 
-TOPIC: {topic}
+=== OUTPUT FORMAT ===
+**{topic}**
 
 KEY FINDINGS:
-1. [First major finding with supporting details]
-2. [Second major finding with supporting details]
-3. [Continue for all important findings...]
-
-{"ANSWERS TO QUESTIONS:" + chr(10) + chr(10).join([f"Q: {q}" + chr(10) + "A: [Answer based on research]" for q in questions]) if questions else ""}
+• [Finding 1 with source]
+• [Finding 2 with source]
+• [Finding 3 with source]
 
 SOURCES:
 1. [Source name] - [URL]
 2. [Source name] - [URL]
-3. [Continue...]
-
-=== RULES ===
-✅ Use {num_sources}+ credible sources
-✅ READ full articles, not just headlines
-✅ Cite all sources
-✅ Distinguish facts from opinions
-❌ DO NOT make up information
-❌ DO NOT use unreliable sources
 """
 
-    # =====================================================
-    # TASK: Price Comparison
-    # =====================================================
     def _price_comparison_task(self,
                                 item_description: str,
                                 sites: list = None,
@@ -471,7 +519,7 @@ SOURCES:
         return f"""
 MISSION: Compare prices for an item across multiple websites.
 
-AUTHENTICATION: You are using my pre-authenticated Edge browser.
+AUTHENTICATION: You are using my pre-authenticated browser.
 
 ITEM TO COMPARE: {item_description}
 
@@ -482,47 +530,30 @@ WEBSITES TO CHECK:
 
 For EACH website:
 1. Navigate to the site
-2. Wait 3 seconds for page to load
-3. Use the search function to find: "{item_description}"
-4. Find the most relevant matching product
-5. Note:
-   - Exact product name
-   - Price (including any discounts)
-   - Shipping cost (if shown)
-   - Availability
-   - Any special offers
-6. Move to next site
+2. Wait for page to load
+3. Search for: "{item_description}"
+4. Find the matching product
+5. Note: product name, price, shipping cost, availability
 
 === PHASE 2: COMPILE COMPARISON ===
 
-Create a comparison table:
+=== OUTPUT FORMAT ===
+**Price Comparison: {item_description}**
 
-ITEM: {item_description}
-
-| Site | Product Name | Price | Shipping | Total | Notes |
-|------|--------------|-------|----------|-------|-------|
-| [Site 1] | [Name] | $X.XX | $X.XX | $X.XX | [Any offers] |
-| [Site 2] | [Name] | $X.XX | $X.XX | $X.XX | [Any offers] |
-...
+| Site | Price | Shipping | Total |
+|------|-------|----------|-------|
+| [Site 1] | $X.XX | $X.XX | $X.XX |
+| [Site 2] | $X.XX | $X.XX | $X.XX |
 
 RECOMMENDATION:
-- Best overall deal: [Site] at $X.XX because [reason]
-- Best price: [Site] at $X.XX
-- Fastest shipping: [Site]
-
-=== RULES ===
-✅ Search ALL listed sites
-✅ Compare equivalent products
-✅ Include shipping in total cost
-✅ Note any coupons or deals
-❌ DO NOT compare different products
-❌ DO NOT skip any sites
+Best deal: [Site] at $X.XX
 """
 
 
 # =====================================================
 # CLI Interface
 # =====================================================
+
 async def main():
     import argparse
 
@@ -545,7 +576,6 @@ async def main():
     parser.add_argument("--time", type=str, help="Time for reservation")
     parser.add_argument("--party-size", type=int, default=2, help="Party size")
     parser.add_argument("--topic", type=str, help="Research topic")
-    parser.add_argument("--add-to-cart-only", action="store_true", default=True, help="Only add to cart, don't purchase")
 
     args = parser.parse_args()
 
@@ -561,7 +591,7 @@ async def main():
         params = {
             "item_description": args.item,
             "max_price": args.max_price,
-            "add_to_cart_only": args.add_to_cart_only
+            "add_to_cart_only": True
         }
 
     elif args.task == "opentable_reservation":

@@ -2,15 +2,13 @@
 Task Planner - AI-Powered Task Analysis and Planning
 =====================================================
 This module provides an intelligent planning layer that:
-1. Analyzes user requests to understand intent
-2. Breaks tasks into actionable steps
-3. Anticipates potential issues and plans fallbacks
-4. Defines clear success criteria
-5. Sets appropriate timeouts and retry limits
-6. Verifies results meet objectives
+1. Uses the Orchestrator to select and coordinate specialist agents
+2. Generates detailed execution plans from agent profiles
+3. Creates enhanced prompts for browser automation
+4. Verifies results meet objectives
 
-This sits between the user's request and the browser agent,
-making the agent significantly smarter and more reliable.
+This is the main interface for planning - it wraps the Orchestrator
+and provides backward-compatible methods.
 """
 
 import os
@@ -42,14 +40,17 @@ if sys.platform == 'win32':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-# Use Google's generative AI directly for planning (simpler than browser_use's ChatGoogle)
 import google.generativeai as genai
+
+# Import new orchestrator and agent system
+from orchestrator import Orchestrator, UnifiedPlan, Intent, Topic
+from agent_loader import AgentLoader
 
 logger = logging.getLogger(__name__)
 
 
 # ============================================
-# Data Structures
+# Data Structures (kept for backward compatibility)
 # ============================================
 
 class TaskType(Enum):
@@ -60,6 +61,17 @@ class TaskType(Enum):
     RESEARCH = "research"
     PRICE_COMPARISON = "price_comparison"
     CUSTOM = "custom"
+
+
+# Map TaskType to Topic for orchestrator
+TASK_TYPE_TO_TOPIC = {
+    TaskType.EMAIL_SYNC: Topic.EMAIL,
+    TaskType.SHOPPING: Topic.PRODUCTS,
+    TaskType.RESERVATION: Topic.FOOD,
+    TaskType.RESEARCH: Topic.GENERAL,
+    TaskType.PRICE_COMPARISON: Topic.PRODUCTS,
+    TaskType.CUSTOM: Topic.GENERAL,
+}
 
 
 @dataclass
@@ -77,8 +89,8 @@ class TaskStep:
     step_number: int
     action: str
     expected_outcome: str
-    verification: str  # How to verify this step succeeded
-    on_failure: str  # What to do if this step fails
+    verification: str
+    on_failure: str
 
 
 @dataclass
@@ -92,7 +104,7 @@ class TaskPlan:
 
     # Understanding
     interpreted_goal: str
-    clarifications: List[str]  # Any assumptions made
+    clarifications: List[str]
 
     # Success criteria
     success_criteria: List[str]
@@ -100,7 +112,7 @@ class TaskPlan:
 
     # Execution plan
     steps: List[TaskStep]
-    estimated_duration: str  # e.g., "2-5 minutes"
+    estimated_duration: str
 
     # Risk management
     potential_issues: List[PotentialIssue]
@@ -108,10 +120,13 @@ class TaskPlan:
     timeout_minutes: int
 
     # Failure handling
-    on_complete_failure: str  # What to report if everything fails
+    on_complete_failure: str
 
     # Generated prompt for browser agent
     enhanced_prompt: str
+
+    # New: Reference to unified plan if available
+    unified_plan: Optional[UnifiedPlan] = None
 
 
 # ============================================
@@ -120,171 +135,124 @@ class TaskPlan:
 
 class TaskPlanner:
     """
-    AI-powered task planner that analyzes requests and creates
-    detailed execution plans for the browser agent.
+    AI-powered task planner that uses the Orchestrator
+    to coordinate specialist agents and create execution plans.
     """
 
     def __init__(self):
-        # Use Google's generative AI directly
+        # Use Google's generative AI for verification
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
 
-        # Configure the API key
         genai.configure(api_key=api_key)
-
-        # Create the model
         self.model = genai.GenerativeModel("gemini-2.0-flash")
 
-        # Planning prompt template
-        self.planning_prompt = self._load_planning_prompt()
+        # Initialize orchestrator
+        self.orchestrator = Orchestrator()
 
-    def _load_planning_prompt(self) -> str:
-        """Load the system prompt for task planning."""
-        return """You are an expert task planner for a browser automation agent. Your job is to:
-1. Understand what the user wants to accomplish
-2. Break it down into clear, actionable steps
-3. Anticipate what could go wrong
-4. Plan fallback strategies
-5. Define clear success criteria
-6. BUILD IN SELF-CORRECTION CHECKPOINTS
-
-You must respond with a valid JSON object (no markdown, no code blocks, just pure JSON).
-
-The JSON must have this exact structure:
-{
-    "interpreted_goal": "What the user actually wants to achieve",
-    "clarifications": ["Any assumptions you're making about the request"],
-    "success_criteria": ["Specific, measurable criteria for success"],
-    "partial_success_acceptable": true/false,
-    "steps": [
-        {
-            "step_number": 1,
-            "action": "What to do",
-            "expected_outcome": "What should happen",
-            "verification": "How to verify it worked",
-            "on_failure": "What to do if it fails"
-        }
-    ],
-    "estimated_duration": "X-Y minutes",
-    "potential_issues": [
-        {
-            "issue": "What might go wrong",
-            "likelihood": "low/medium/high",
-            "solution": "How to handle it",
-            "fallback_action": "Alternative approach if solution fails"
-        }
-    ],
-    "max_retries": 3,
-    "timeout_minutes": 5,
-    "on_complete_failure": "What to report to user if everything fails"
-}
-
-CRITICAL GUIDELINES FOR EFFECTIVE SEARCHING:
-
-1. ALWAYS USE SPECIFIC SEARCH TERMS:
-   - BAD: Browse a general category or homepage
-   - GOOD: Search Google for "[SPECIFIC ITEM] recommendations" or use site-specific search
-   - When searching ANY site, ALWAYS include the specific item name in the search query
-   - Never just browse a general category - always search with specifics
-
-2. CHOOSE SOURCES BASED ON TOPIC:
-   - Books: Goodreads, Amazon reviews, literary blogs, genre-specific forums
-   - Restaurants: Yelp, Google Maps, TripAdvisor, local food blogs
-   - Products: Wirecutter, Amazon reviews, manufacturer sites, tech review sites
-   - Travel: TripAdvisor, Lonely Planet, travel blogs, destination-specific sites
-   - General: Use Google to find authoritative sources for the specific topic
-   - Use site-specific searches when needed: "topic site:example.com"
-
-3. SELF-CORRECTION CHECKPOINTS (CRITICAL):
-   - After every 2-3 actions, ADD A CHECKPOINT STEP to verify progress
-   - If scrolling more than 2 times without finding relevant content, STOP and re-evaluate
-   - Checkpoint template: "CHECKPOINT: Verify current page shows results for [SPECIFIC ITEM]. If not, use fallback search."
-
-4. RE-EVALUATION TRIGGERS:
-   - If search results don't mention the specific item, STOP and try a different search
-   - If a page seems generic/unrelated, don't keep scrolling - go back and refine the search
-   - Use Google as the universal fallback: search "[specific item] recommendations site:[current site]"
-
-5. PARSING USER REQUESTS (CRITICAL):
-   - Extract ONLY the item/product/book name from the request
-   - IGNORE conversational fluff: "Thanks", "Please", "Can you", "Hi", "Hey", etc.
-   - Example: "Thanks. Add He Who Fights With Monsters to cart"
-     → Item = "He Who Fights With Monsters" (NOT "Thanks. He Who Fights With Monsters")
-
-6. SCOPE - DO ONLY WHAT WAS ASKED:
-   - Complete the requested task and STOP
-   - Do NOT add bonus features, recommendations, or extra suggestions
-   - If asked to "add to cart" → add to cart, confirm, done
-   - If asked to "research" → research, summarize, done
-   - Keep responses focused and minimal
-
-7. OTHER GUIDELINES:
-   - Be specific and actionable in your steps
-   - Anticipate real-world issues (login prompts, CAPTCHAs, out of stock, etc.)
-   - Set realistic timeouts based on task complexity
-   - Always have fallback strategies
-   - Success criteria should be measurable
-"""
+        # Load agent profiles for reference
+        self.agent_loader = AgentLoader()
 
     async def plan_task(self, user_request: str, task_type: Optional[TaskType] = None) -> TaskPlan:
         """
         Analyze a user request and create a detailed execution plan.
 
+        Uses the Orchestrator to:
+        1. Classify intent and topic
+        2. Select appropriate specialist agents
+        3. Generate sub-plans from each agent
+        4. Aggregate into unified execution plan
+
         Args:
             user_request: The raw request from the user
-            task_type: Optional task type hint
+            task_type: Optional task type hint (for backward compatibility)
 
         Returns:
             TaskPlan object with complete execution strategy
         """
         logger.info(f"Planning task: {user_request[:50]}...")
 
-        # Detect task type if not provided
-        if task_type is None:
-            task_type = self._detect_task_type(user_request)
-
-        # Get context based on task type
-        context = self._get_task_context(task_type)
-
-        # Build the planning request
-        planning_request = f"""
-{self.planning_prompt}
-
-TASK CONTEXT:
-{context}
-
-USER REQUEST:
-"{user_request}"
-
-Create a detailed execution plan for this request. Remember to output ONLY valid JSON, no other text.
-"""
-
         try:
-            # Call Gemini to create the plan
-            response = await self.model.generate_content_async(planning_request)
-            plan_json = self._parse_json_response(response.text)
+            # Use orchestrator for the heavy lifting
+            unified_plan = await self.orchestrator.process_request(user_request)
 
-            # Create TaskPlan object
-            task_plan = self._build_task_plan(
-                plan_json=plan_json,
-                original_request=user_request,
-                task_type=task_type
-            )
+            # Convert to TaskPlan format for backward compatibility
+            task_plan = self._unified_to_task_plan(unified_plan, task_type)
 
-            # Generate the enhanced prompt for the browser agent
-            task_plan.enhanced_prompt = self._generate_enhanced_prompt(task_plan)
-
-            logger.info(f"Task plan created with {len(task_plan.steps)} steps")
+            logger.info(f"Task plan created with {len(task_plan.steps)} steps using agents: {unified_plan.agents_used}")
             return task_plan
 
         except Exception as e:
-            logger.error(f"Error creating task plan: {e}")
-            # Return a basic plan as fallback
-            return self._create_fallback_plan(user_request, task_type, str(e))
+            logger.error(f"Orchestrator failed, using fallback: {e}")
+            # Fall back to simple planning
+            if task_type is None:
+                task_type = self._detect_task_type(user_request)
+            return await self._create_fallback_plan(user_request, task_type, str(e))
+
+    def _unified_to_task_plan(self, unified: UnifiedPlan, task_type_hint: Optional[TaskType] = None) -> TaskPlan:
+        """Convert a UnifiedPlan to TaskPlan for backward compatibility."""
+
+        # Determine task type from topic or hint
+        if task_type_hint:
+            task_type = task_type_hint
+        else:
+            topic_to_task = {
+                Topic.EMAIL: TaskType.EMAIL_SYNC,
+                Topic.FOOD: TaskType.RESERVATION if unified.intent == Intent.ACTION else TaskType.RESEARCH,
+                Topic.PRODUCTS: TaskType.SHOPPING if unified.intent == Intent.ACTION else TaskType.PRICE_COMPARISON,
+                Topic.BOOKS: TaskType.SHOPPING if unified.intent == Intent.ACTION else TaskType.RESEARCH,
+                Topic.TECH: TaskType.SHOPPING if unified.intent == Intent.ACTION else TaskType.RESEARCH,
+                Topic.TRAVEL: TaskType.RESEARCH,
+                Topic.GENERAL: TaskType.RESEARCH,
+            }
+            task_type = topic_to_task.get(unified.topic, TaskType.CUSTOM)
+
+        # Extract steps from execution phases
+        steps = []
+        step_num = 1
+        for phase in unified.execution_phases:
+            for step_data in phase.get('steps', []):
+                steps.append(TaskStep(
+                    step_number=step_num,
+                    action=step_data.get('action', ''),
+                    expected_outcome=step_data.get('expected_outcome', ''),
+                    verification=step_data.get('verification', ''),
+                    on_failure=step_data.get('on_failure', 'Report error and continue')
+                ))
+                step_num += 1
+
+        # Extract potential issues from checkpoints
+        potential_issues = []
+        for checkpoint in unified.verification_checkpoints:
+            potential_issues.append(PotentialIssue(
+                issue=f"Failure at checkpoint: {checkpoint.get('check', '')}",
+                likelihood="medium",
+                solution=checkpoint.get('on_failure', 'Retry with alternative'),
+                fallback_action=None
+            ))
+
+        return TaskPlan(
+            task_id=unified.task_id,
+            task_type=task_type,
+            original_request=unified.original_request,
+            timestamp=datetime.now().isoformat(),
+            interpreted_goal=unified.original_request,
+            clarifications=[f"Using agents: {', '.join(unified.agents_used)}"],
+            success_criteria=unified.success_criteria,
+            partial_success_acceptable=True,
+            steps=steps,
+            estimated_duration=unified.estimated_duration,
+            potential_issues=potential_issues,
+            max_retries=unified.max_retries,
+            timeout_minutes=unified.timeout_minutes,
+            on_complete_failure="Report detailed error with what was attempted",
+            enhanced_prompt=unified.executor_prompt,
+            unified_plan=unified
+        )
 
     def _detect_task_type(self, request: str) -> TaskType:
-        """Detect the type of task from the request."""
+        """Detect the type of task from the request (fallback method)."""
         request_lower = request.lower()
 
         if any(word in request_lower for word in ['email', 'inbox', 'flagged', 'todo', 'calendar']):
@@ -300,322 +268,13 @@ Create a detailed execution plan for this request. Remember to output ONLY valid
         else:
             return TaskType.CUSTOM
 
-    def _get_task_context(self, task_type: TaskType) -> str:
-        """Get relevant context for the task type."""
-        contexts = {
-            TaskType.EMAIL_SYNC: """
-This is an EMAIL/CALENDAR task using Outlook Web (outlook.office.com).
-- User has 3 inboxes: Main, Becky, Tyler
-- Must use Filter > Flagged to find flagged emails
-- Creates ONE calendar event "🤖 {To-Do List}" for tomorrow at 7 AM
-- Must READ each email to understand context
-- Browser is pre-authenticated (no login needed)
-""",
-            TaskType.SHOPPING: """
-This is a SHOPPING task, typically on Amazon.
-
-PARSING THE ITEM NAME (CRITICAL):
-- Extract ONLY the product/book name from the request
-- IGNORE conversational words like: "Thanks", "Please", "Can you", "Hi", "Hey"
-- Example: "Thanks. Can you add He Who Fights With Monsters to my cart?"
-  → Item name is: "He Who Fights With Monsters" (NOT "Thanks. He Who Fights With Monsters")
-
-SCOPE - DO ONLY WHAT WAS ASKED:
-- If asked to "add to cart" → just add to cart, done
-- If asked to "find" → find and report, done
-- Do NOT provide recommendations unless specifically asked
-- Do NOT add extra features or suggestions
-- Keep it simple - complete the task and stop
-
-TASK RULES:
-- User wants to ADD TO CART (not complete purchase) unless specified
-- Consider: price limits, ratings (4+ stars preferred), Prime eligibility
-- Browser is pre-authenticated (no login needed)
-- If item not found, suggest alternatives
-- Watch for: out of stock, price changes, wrong item variants
-
-OUTPUT FORMAT:
-- Just confirm the action: "✅ [Item Name] added to cart"
-- No extra recommendations or suggestions unless asked
-""",
-            TaskType.RESERVATION: """
-This is a RESTAURANT RESERVATION task using OpenTable.
-- Need: restaurant/cuisine, date, time, party size
-- Browser is pre-authenticated (no login needed)
-- If exact time unavailable, find closest available
-- Confirm all details before completing
-- Watch for: no availability, wrong date format, restaurant closed
-""",
-            TaskType.RESEARCH: """
-This is a RESEARCH task using web search.
-
-*** TWO-STEP RESEARCH PROCESS (CRITICAL) ***
-
-STEP 1 - GATHER RECOMMENDATIONS/INFO:
-- Search Google, Reddit, forums, or relevant sites for the topic
-- Extract the NAMES/TITLES of recommended items
-- Reddit usernames are NOT creators - ignore them
-- Focus on WHAT is being recommended, not WHO recommended it
-
-STEP 2 - VERIFY AND ENRICH:
-- For each item found, search for REAL info (official sites, Wikipedia, etc.)
-- Find ACTUAL details (creator, location, brand, key features)
-- Get a brief description of what it is
-- Understand WHY it matches the user's request
-
-EXAMPLES:
-- Books: Find titles → verify authors on Amazon/Goodreads
-- Restaurants: Find names → verify location, cuisine, ratings on Yelp/Google
-- Products: Find names → verify specs, prices on official sites
-- Travel: Find destinations → verify attractions, best times to visit
-
-CRITICAL RULES:
-- NEVER use Reddit usernames as creators/owners
-- ALWAYS verify details from official or authoritative sources
-- Explain WHY each item matches the request
-- Adapt your approach based on what's being researched
-
-SEARCH STRATEGY (choose sources based on topic):
-- Books: Goodreads, Amazon, literary blogs, genre forums
-- Restaurants: Yelp, Google Maps, TripAdvisor
-- Products: Wirecutter, Amazon reviews, manufacturer sites
-- Travel: TripAdvisor, Lonely Planet, travel blogs
-- Tech: CNET, The Verge, specialized forums
-- General: Start with Google, then dig into authoritative sources
-- Use site-specific searches when needed: "topic site:example.com"
-- Cross-reference with official sources for verification
-
-GENERAL:
-- Goal is to provide useful recommendations with context
-- Explain why each item would appeal to the user
-- Keep final output SHORT and actionable
-""",
-            TaskType.PRICE_COMPARISON: """
-This is a PRICE COMPARISON task across multiple sites.
-- Sites to check: Amazon, Walmart, Target, Best Buy
-- Include shipping costs in total
-- Note any special deals or coupons
-- Compare equivalent products (same model/specs)
-- Watch for: different variants, refurbished vs new
-""",
-            TaskType.CUSTOM: """
-This is a CUSTOM task that doesn't fit standard categories.
-- Analyze carefully what the user wants
-- Break into logical steps
-- Be extra careful about assumptions
-- Ask for clarification if truly ambiguous
-"""
-        }
-        return contexts.get(task_type, contexts[TaskType.CUSTOM])
-
-    def _parse_json_response(self, response_text: str) -> Dict:
-        """Parse JSON from the model response."""
-        # Clean up the response
-        text = response_text.strip()
-
-        # Remove markdown code blocks if present
-        if text.startswith('```'):
-            lines = text.split('\n')
-            # Remove first and last lines (```json and ```)
-            text = '\n'.join(lines[1:-1])
-
-        # Try to parse JSON
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError as e:
-            logger.warning(f"JSON parse error: {e}")
-            # Try to find JSON in the text
-            import re
-            json_match = re.search(r'\{[\s\S]*\}', text)
-            if json_match:
-                return json.loads(json_match.group())
-            raise ValueError(f"Could not parse JSON from response: {text[:200]}")
-
-    def _build_task_plan(self, plan_json: Dict, original_request: str, task_type: TaskType) -> TaskPlan:
-        """Build a TaskPlan object from the JSON response."""
+    async def _create_fallback_plan(self, request: str, task_type: TaskType, error: str) -> TaskPlan:
+        """Create a basic fallback plan when orchestrator fails."""
         import uuid
 
-        # Parse steps
-        steps = []
-        for step_data in plan_json.get('steps', []):
-            steps.append(TaskStep(
-                step_number=step_data.get('step_number', len(steps) + 1),
-                action=step_data.get('action', ''),
-                expected_outcome=step_data.get('expected_outcome', ''),
-                verification=step_data.get('verification', ''),
-                on_failure=step_data.get('on_failure', 'Report error and continue')
-            ))
-
-        # Parse potential issues
-        issues = []
-        for issue_data in plan_json.get('potential_issues', []):
-            issues.append(PotentialIssue(
-                issue=issue_data.get('issue', ''),
-                likelihood=issue_data.get('likelihood', 'medium'),
-                solution=issue_data.get('solution', ''),
-                fallback_action=issue_data.get('fallback_action')
-            ))
-
-        return TaskPlan(
-            task_id=str(uuid.uuid4())[:8],
-            task_type=task_type,
-            original_request=original_request,
-            timestamp=datetime.now().isoformat(),
-            interpreted_goal=plan_json.get('interpreted_goal', original_request),
-            clarifications=plan_json.get('clarifications', []),
-            success_criteria=plan_json.get('success_criteria', []),
-            partial_success_acceptable=plan_json.get('partial_success_acceptable', True),
-            steps=steps,
-            estimated_duration=plan_json.get('estimated_duration', '3-5 minutes'),
-            potential_issues=issues,
-            max_retries=plan_json.get('max_retries', 3),
-            timeout_minutes=plan_json.get('timeout_minutes', 5),
-            on_complete_failure=plan_json.get('on_complete_failure', 'Report detailed error to user'),
-            enhanced_prompt=""  # Will be set after
-        )
-
-    def _get_output_format(self, task_type: TaskType) -> str:
-        """Get task-type specific output format instructions."""
-        formats = {
-            TaskType.SHOPPING: """
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must be SHORT and confirm the action:
-
-✅ [Action completed] - [Item name]
-
-EXAMPLES:
-- "✅ Added to cart - He Who Fights With Monsters"
-- "✅ Removed from cart - He Who Fights With Monsters"
-- "✅ Item not found in cart"
-
-RULES:
-- Just confirm what was done in ONE sentence
-- NO recommendations unless asked
-- NO extra information
-- Complete the task and STOP
-""",
-            TaskType.RESEARCH: """
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must be a SHORT, CONCISE summary appropriate for the topic.
-
-FORMAT (adapt to what's being researched):
-• **[Item/Name]** - [Key identifier like author, location, brand, etc. if applicable]
-  [1-2 sentences: brief description + why it's relevant to the request]
-
-EXAMPLES:
-- For books: "**Cradle** by Will Wight - Fast-paced cultivation fantasy with witty characters."
-- For restaurants: "**Carbone** - Italian, Greenwich Village - Upscale Italian with famous spicy rigatoni."
-- For products: "**Sony WH-1000XM5** - Best-in-class noise cancellation, 30hr battery."
-- For travel: "**Kyoto, Japan** - Best in spring for cherry blossoms, temples, and traditional culture."
-
-RULES:
-- Adapt the format to fit what's being researched
-- Keep each item to 1-2 sentences MAX
-- Focus on WHY each item matches the user's request
-- NO raw data dumps or excessive details
-""",
-            TaskType.RESERVATION: """
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must confirm the reservation:
-
-✅ Reservation confirmed:
-- Restaurant: [Name]
-- Date/Time: [Date and Time]
-- Party size: [Number]
-- Confirmation #: [If available]
-
-RULES:
-- Just confirm the details
-- NO extra suggestions
-""",
-            TaskType.EMAIL_SYNC: """
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must summarize what was done:
-
-✅ Email sync complete:
-- [Number] flagged emails processed
-- Calendar event created for [date]
-
-RULES:
-- Brief summary only
-- List key actions taken
-""",
-        }
-        return formats.get(task_type, """
-=== REQUIRED OUTPUT FORMAT (CRITICAL) ===
-Your FINAL response must be SHORT and confirm what was done.
-Just state the action completed in 1-2 sentences.
-NO extra information or suggestions.
-""")
-
-    def _generate_enhanced_prompt(self, plan: TaskPlan) -> str:
-        """Generate an enhanced prompt for the browser agent based on the plan."""
-
-        # Format steps
-        steps_text = "\n".join([
-            f"""
-STEP {s.step_number}: {s.action}
-   Expected: {s.expected_outcome}
-   Verify by: {s.verification}
-   If fails: {s.on_failure}
-""" for s in plan.steps
-        ])
-
-        # Format potential issues
-        issues_text = "\n".join([
-            f"- {i.issue} ({i.likelihood} likelihood)\n  → Solution: {i.solution}" +
-            (f"\n  → Fallback: {i.fallback_action}" if i.fallback_action else "")
-            for i in plan.potential_issues
-        ])
-
-        # Format success criteria
-        criteria_text = "\n".join([f"✓ {c}" for c in plan.success_criteria])
-
-        # Task-type specific output format
-        output_format = self._get_output_format(plan.task_type)
-
-        prompt = f"""
-MISSION: {plan.interpreted_goal}
-
-AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attempt to log in.
-
-{output_format}
-
-
-=== SUCCESS CRITERIA ===
-{criteria_text}
-
-=== EXECUTION PLAN ===
-{steps_text}
-
-=== POTENTIAL ISSUES & SOLUTIONS ===
-{issues_text}
-
-=== CONSTRAINTS ===
-- Maximum retries per step: {plan.max_retries}
-- Total timeout: {plan.timeout_minutes} minutes
-- Partial success acceptable: {"Yes" if plan.partial_success_acceptable else "No"}
-
-=== IF EVERYTHING FAILS ===
-{plan.on_complete_failure}
-
-=== IMPORTANT RULES ===
-✅ Follow the steps in order
-✅ Verify each step before proceeding
-✅ When task is COMPLETE, use "done" action immediately - do NOT continue
-✅ Keep output SHORT - confirm action and stop
-❌ DO NOT exceed timeout
-❌ DO NOT retry more than {plan.max_retries} times per step
-❌ DO NOT add extra features or recommendations unless asked
-❌ DO NOT continue after the task is complete
-
-Begin execution now.
-"""
-        return prompt
-
-    def _create_fallback_plan(self, request: str, task_type: TaskType, error: str) -> TaskPlan:
-        """Create a basic fallback plan when planning fails."""
-        import uuid
+        # Try to get relevant agent profile for context
+        topic = TASK_TYPE_TO_TOPIC.get(task_type, Topic.GENERAL)
+        context = self._get_fallback_context(task_type)
 
         return TaskPlan(
             task_id=str(uuid.uuid4())[:8],
@@ -623,7 +282,7 @@ Begin execution now.
             original_request=request,
             timestamp=datetime.now().isoformat(),
             interpreted_goal=request,
-            clarifications=[f"Planning failed, using basic execution: {error}"],
+            clarifications=[f"Using fallback planning: {error}"],
             success_criteria=["Complete the requested task"],
             partial_success_acceptable=True,
             steps=[TaskStep(
@@ -643,11 +302,52 @@ MISSION: {request}
 
 AUTHENTICATION: You are using a pre-authenticated browser session. DO NOT attempt to log in.
 
+{context}
+
 Execute this task to the best of your ability. Report any issues encountered.
 
 Begin now.
-"""
+""",
+            unified_plan=None
         )
+
+    def _get_fallback_context(self, task_type: TaskType) -> str:
+        """Get context for fallback plans."""
+        contexts = {
+            TaskType.EMAIL_SYNC: """
+CONTEXT: Email/Calendar sync using Outlook Web.
+- Check all inboxes for flagged emails
+- Create calendar event with action items
+- Browser is pre-authenticated
+""",
+            TaskType.SHOPPING: """
+CONTEXT: Shopping task (likely Amazon).
+- Search for the item
+- Check ratings and price
+- Add to cart only (don't purchase)
+- Browser is pre-authenticated
+""",
+            TaskType.RESERVATION: """
+CONTEXT: Restaurant reservation (likely OpenTable).
+- Search for restaurant
+- Check availability for date/time/party size
+- Complete booking
+- Browser is pre-authenticated
+""",
+            TaskType.RESEARCH: """
+CONTEXT: Web research task.
+- Use Google to find relevant sources
+- Extract key information
+- Provide structured summary
+""",
+            TaskType.PRICE_COMPARISON: """
+CONTEXT: Price comparison across sites.
+- Check multiple retailers
+- Compare equivalent products
+- Include shipping costs
+""",
+        }
+        return contexts.get(task_type, "Execute the task carefully and report results.")
 
     async def verify_result(self, plan: TaskPlan, result: str) -> Dict[str, Any]:
         """
@@ -668,6 +368,9 @@ ORIGINAL GOAL:
 
 SUCCESS CRITERIA:
 {chr(10).join(['- ' + c for c in plan.success_criteria])}
+
+AGENTS USED:
+{', '.join(plan.unified_plan.agents_used) if plan.unified_plan else 'Standard execution'}
 
 TASK RESULT:
 {result}
@@ -694,9 +397,28 @@ Analyze if the success criteria were met. Respond with JSON only:
                 "summary": "Could not verify result automatically"
             }
 
+    def _parse_json_response(self, response_text: str) -> Dict:
+        """Parse JSON from the model response."""
+        text = response_text.strip()
+
+        # Remove markdown code blocks if present
+        if text.startswith('```'):
+            lines = text.split('\n')
+            text = '\n'.join(lines[1:-1])
+
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parse error: {e}")
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', text)
+            if json_match:
+                return json.loads(json_match.group())
+            raise ValueError(f"Could not parse JSON from response: {text[:200]}")
+
     def plan_to_dict(self, plan: TaskPlan) -> Dict:
         """Convert a TaskPlan to a dictionary for serialization."""
-        return {
+        result = {
             "task_id": plan.task_id,
             "task_type": plan.task_type.value,
             "original_request": plan.original_request,
@@ -712,6 +434,14 @@ Analyze if the success criteria were met. Respond with JSON only:
             "timeout_minutes": plan.timeout_minutes,
             "on_complete_failure": plan.on_complete_failure
         }
+
+        # Add orchestrator info if available
+        if plan.unified_plan:
+            result["agents_used"] = plan.unified_plan.agents_used
+            result["intent"] = plan.unified_plan.intent.value
+            result["topic"] = plan.unified_plan.topic.value
+
+        return result
 
 
 # ============================================
@@ -731,25 +461,30 @@ async def plan_and_describe(request: str) -> str:
 
 **Goal:** {plan.interpreted_goal}
 
-**Steps:**
 """
+
+    # Show agents used if available
+    if plan.unified_plan:
+        description += f"**Agents:** {', '.join(plan.unified_plan.agents_used)}\n"
+        description += f"**Intent:** {plan.unified_plan.intent.value} | **Topic:** {plan.unified_plan.topic.value}\n\n"
+
+    description += "**Steps:**\n"
     for step in plan.steps:
         description += f"{step.step_number}. {step.action}\n"
 
-    description += f"""
-**Success Criteria:**
-"""
+    description += "\n**Success Criteria:**\n"
     for criterion in plan.success_criteria:
         description += f"✓ {criterion}\n"
 
     description += f"""
 **Estimated Time:** {plan.estimated_duration}
 **Max Retries:** {plan.max_retries}
-
-**Potential Issues:**
 """
-    for issue in plan.potential_issues[:3]:  # Show top 3
-        description += f"⚠️ {issue.issue} → {issue.solution}\n"
+
+    if plan.potential_issues:
+        description += "\n**Potential Issues:**\n"
+        for issue in plan.potential_issues[:3]:
+            description += f"⚠️ {issue.issue} → {issue.solution}\n"
 
     return description
 
@@ -761,6 +496,8 @@ async def plan_and_describe(request: str) -> str:
 if __name__ == "__main__":
     import asyncio
 
+    logging.basicConfig(level=logging.INFO)
+
     async def test_planner():
         planner = TaskPlanner()
 
@@ -769,6 +506,7 @@ if __name__ == "__main__":
             "Book a table at a nice Italian restaurant for 2 people tomorrow at 7pm",
             "Sync my flagged emails to the calendar",
             "Research the best CRM software for small businesses",
+            "Find books similar to The Name of the Wind and add the top pick to my cart",
         ]
 
         for request in test_requests:
@@ -778,18 +516,20 @@ if __name__ == "__main__":
 
             plan = await planner.plan_task(request)
 
-            print(f"\nGoal: {plan.interpreted_goal}")
+            print(f"\nTask ID: {plan.task_id}")
             print(f"Type: {plan.task_type.value}")
+            if plan.unified_plan:
+                print(f"Intent: {plan.unified_plan.intent.value}")
+                print(f"Topic: {plan.unified_plan.topic.value}")
+                print(f"Agents: {plan.unified_plan.agents_used}")
             print(f"Duration: {plan.estimated_duration}")
-            print(f"\nSteps:")
-            for step in plan.steps:
-                print(f"  {step.step_number}. {step.action}")
+            print(f"\nSteps ({len(plan.steps)}):")
+            for step in plan.steps[:5]:  # Show first 5
+                print(f"  {step.step_number}. {step.action[:60]}...")
+            if len(plan.steps) > 5:
+                print(f"  ... and {len(plan.steps) - 5} more steps")
             print(f"\nSuccess Criteria:")
-            for c in plan.success_criteria:
+            for c in plan.success_criteria[:3]:
                 print(f"  ✓ {c}")
-            print(f"\nPotential Issues:")
-            for issue in plan.potential_issues:
-                print(f"  ⚠️ {issue.issue} ({issue.likelihood})")
-                print(f"     → {issue.solution}")
 
     asyncio.run(test_planner())
