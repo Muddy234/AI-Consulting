@@ -14,3 +14,4 @@ ai-agent/telegram_bot.log
 # Example/template files (safe to commit)
 # ai-agent/.env.example
 ai-agent/.env
+ai-agent/.env
