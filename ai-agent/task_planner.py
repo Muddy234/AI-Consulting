@@ -183,15 +183,18 @@ The JSON must have this exact structure:
 CRITICAL GUIDELINES FOR EFFECTIVE SEARCHING:
 
 1. ALWAYS USE SPECIFIC SEARCH TERMS:
-   - BAD: Go to r/booksuggestions and browse
-   - GOOD: Search Google for "books like [SPECIFIC ITEM] site:reddit.com"
+   - BAD: Browse a general category or homepage
+   - GOOD: Search Google for "[SPECIFIC ITEM] recommendations" or use site-specific search
    - When searching ANY site, ALWAYS include the specific item name in the search query
    - Never just browse a general category - always search with specifics
 
-2. TARGETED VS GENERAL SEARCHES:
-   - Use Google site-specific searches: "topic site:reddit.com" or "topic site:goodreads.com"
-   - When on a site, use its search function WITH the specific item name
-   - Prefer subreddits specific to the topic (e.g., r/litrpg for LitRPG books, r/fantasy for fantasy)
+2. CHOOSE SOURCES BASED ON TOPIC:
+   - Books: Goodreads, Amazon reviews, literary blogs, genre-specific forums
+   - Restaurants: Yelp, Google Maps, TripAdvisor, local food blogs
+   - Products: Wirecutter, Amazon reviews, manufacturer sites, tech review sites
+   - Travel: TripAdvisor, Lonely Planet, travel blogs, destination-specific sites
+   - General: Use Google to find authoritative sources for the specific topic
+   - Use site-specific searches when needed: "topic site:example.com"
 
 3. SELF-CORRECTION CHECKPOINTS (CRITICAL):
    - After every 2-3 actions, ADD A CHECKPOINT STEP to verify progress
@@ -372,10 +375,15 @@ CRITICAL RULES:
 - Explain WHY each item matches the request
 - Adapt your approach based on what's being researched
 
-SEARCH STRATEGY:
-- Use Google site-specific searches: "[topic] site:reddit.com" or "[topic] site:yelp.com"
-- Use niche communities relevant to the topic
-- Cross-reference with official sources
+SEARCH STRATEGY (choose sources based on topic):
+- Books: Goodreads, Amazon, literary blogs, genre forums
+- Restaurants: Yelp, Google Maps, TripAdvisor
+- Products: Wirecutter, Amazon reviews, manufacturer sites
+- Travel: TripAdvisor, Lonely Planet, travel blogs
+- Tech: CNET, The Verge, specialized forums
+- General: Start with Google, then dig into authoritative sources
+- Use site-specific searches when needed: "topic site:example.com"
+- Cross-reference with official sources for verification
 
 GENERAL:
 - Goal is to provide useful recommendations with context
