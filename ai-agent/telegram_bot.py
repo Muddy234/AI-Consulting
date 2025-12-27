@@ -340,14 +340,14 @@ When ON, I analyze your request first, create a detailed plan with steps and fal
             if result["status"] == "success":
                 verified_text = ""
                 if result.get("verified") is True:
-                    verified_text = "\n✅ **Verified:** " + result.get("verification_summary", "")
+                    verified_text = "\n✅ Verified: " + result.get("verification_summary", "")
                 elif result.get("verified") is False:
-                    verified_text = "\n⚠️ **Note:** " + result.get("verification_summary", "")
+                    verified_text = "\n⚠️ Note: " + result.get("verification_summary", "")
 
+                # Send without markdown to avoid parsing issues with dynamic content
                 await update.message.reply_text(
-                    f"✅ **Email sync complete!**{verified_text}\n\n"
-                    f"Check your calendar for tomorrow's To-Do List.",
-                    parse_mode='Markdown'
+                    f"✅ Email sync complete!{verified_text}\n\n"
+                    f"Check your calendar for tomorrow's To-Do List."
                 )
             else:
                 await update.message.reply_text(
@@ -410,14 +410,14 @@ When ON, I analyze your request first, create a detailed plan with steps and fal
             if result["status"] == "success":
                 verified_text = ""
                 if result.get("verified") is True:
-                    verified_text = "\n✅ **Verified:** " + result.get("verification_summary", "")
+                    verified_text = "\n✅ Verified: " + result.get("verification_summary", "")
                 elif result.get("verified") is False:
-                    verified_text = "\n⚠️ **Note:** " + result.get("verification_summary", "")
+                    verified_text = "\n⚠️ Note: " + result.get("verification_summary", "")
 
+                # Send without markdown to avoid parsing issues with dynamic content
                 await update.message.reply_text(
-                    f"✅ **Done!** Check your Amazon cart.{verified_text}\n\n"
-                    f"{result.get('result', '')[:500]}",
-                    parse_mode='Markdown'
+                    f"✅ Done! Check your Amazon cart.{verified_text}\n\n"
+                    f"{result.get('result', '')[:500]}"
                 )
             else:
                 await update.message.reply_text(f"⚠️ {result.get('message', 'Could not complete task')}")
@@ -489,13 +489,13 @@ When ON, I analyze your request first, create a detailed plan with steps and fal
             if result["status"] == "success":
                 verified_text = ""
                 if result.get("verified") is True:
-                    verified_text = "\n✅ **Verified:** " + result.get("verification_summary", "")
+                    verified_text = "\n✅ Verified: " + result.get("verification_summary", "")
                 elif result.get("verified") is False:
-                    verified_text = "\n⚠️ **Note:** " + result.get("verification_summary", "")
+                    verified_text = "\n⚠️ Note: " + result.get("verification_summary", "")
 
+                # Send without markdown to avoid parsing issues with dynamic content
                 await update.message.reply_text(
-                    f"✅ **Reservation complete!**{verified_text}\n\n{result.get('result', '')[:500]}",
-                    parse_mode='Markdown'
+                    f"✅ Reservation complete!{verified_text}\n\n{result.get('result', '')[:500]}"
                 )
             else:
                 await update.message.reply_text(f"⚠️ {result.get('message', 'Could not complete reservation')}")
@@ -543,21 +543,21 @@ When ON, I analyze your request first, create a detailed plan with steps and fal
             if result["status"] == "success":
                 verified_text = ""
                 if result.get("verified") is True:
-                    verified_text = "✅ **Verified:** " + result.get("verification_summary", "") + "\n\n"
+                    verified_text = "✅ Verified: " + result.get("verification_summary", "") + "\n\n"
                 elif result.get("verified") is False:
-                    verified_text = "⚠️ **Note:** " + result.get("verification_summary", "") + "\n\n"
+                    verified_text = "⚠️ Note: " + result.get("verification_summary", "") + "\n\n"
 
-                # Send result (may need to split if too long)
+                # Send result without markdown to avoid parsing issues with dynamic content
                 response = result.get('result', 'Research complete')
-                header = f"📋 **Research Results:**\n\n{verified_text}"
+                header = f"📋 Research Results:\n\n{verified_text}"
 
                 if len(header + response) > 4000:
-                    await update.message.reply_text(header, parse_mode='Markdown')
+                    await update.message.reply_text(header)
                     # Split into chunks
                     for i in range(0, len(response), 4000):
                         await update.message.reply_text(response[i:i+4000])
                 else:
-                    await update.message.reply_text(header + response, parse_mode='Markdown')
+                    await update.message.reply_text(header + response)
             else:
                 await update.message.reply_text(f"⚠️ {result.get('message', 'Could not complete research')}")
         except Exception as e:
@@ -604,13 +604,13 @@ When ON, I analyze your request first, create a detailed plan with steps and fal
             if result["status"] == "success":
                 verified_text = ""
                 if result.get("verified") is True:
-                    verified_text = "\n✅ **Verified:** " + result.get("verification_summary", "")
+                    verified_text = "\n✅ Verified: " + result.get("verification_summary", "")
                 elif result.get("verified") is False:
-                    verified_text = "\n⚠️ **Note:** " + result.get("verification_summary", "")
+                    verified_text = "\n⚠️ Note: " + result.get("verification_summary", "")
 
+                # Send without markdown to avoid parsing issues with dynamic content
                 await update.message.reply_text(
-                    f"📊 **Price Comparison:**{verified_text}\n\n{result.get('result', '')[:4000]}",
-                    parse_mode='Markdown'
+                    f"📊 Price Comparison:{verified_text}\n\n{result.get('result', '')[:4000]}"
                 )
             else:
                 await update.message.reply_text(f"⚠️ {result.get('message', 'Could not complete comparison')}")
