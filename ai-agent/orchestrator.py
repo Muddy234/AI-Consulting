@@ -198,9 +198,9 @@ class Orchestrator:
         genai.configure(api_key=api_key)
 
         # Model selection:
-        # - Orchestration/Research: Gemini 2.0 Flash Exp (3.0 equivalent)
+        # - Orchestration/Research: Gemini 3.0 Flash
         # - Browser automation uses 2.0 Flash (configured in agent_tasks.py)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        self.model = genai.GenerativeModel("gemini-3-flash")
 
         # Load agent profiles
         self.agent_loader = AgentLoader()
