@@ -5,7 +5,11 @@ Executes browser automation tasks using the Executor agent profile.
 Integrates with the Orchestrator for enhanced prompt generation.
 
 Supports both Windows (Edge) and Raspberry Pi (Chromium).
-Uses Gemini 2.0 Flash for all operations.
+
+Model Configuration:
+- Browser automation: Gemini 2.0 Flash (stable for browser_use)
+- Orchestration/Research: Gemini 2.0 Flash Exp (3.0) - see orchestrator.py
+- Summary/Verification: Gemini 2.0 Flash Exp (3.0) - see task_planner.py
 """
 
 import os
@@ -101,7 +105,9 @@ class AgentTaskRunner:
         self.browser_profile = get_browser_profile()
         logger.info(f"Browser profile configured for: {os.getenv('BROWSER_TYPE', 'auto')}")
 
-        # LLM - Using Gemini 2.0 Flash
+        # LLM - Using Gemini 2.0 Flash for browser automation
+        # NOTE: Keep at 2.0 Flash for browsing stability
+        # Orchestration/Research/Summary use 2.0 Flash Exp (3.0) in orchestrator.py
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             os.environ["GOOGLE_API_KEY"] = api_key

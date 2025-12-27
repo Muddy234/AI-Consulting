@@ -140,15 +140,18 @@ class TaskPlanner:
     """
 
     def __init__(self):
-        # Use Google's generative AI for verification
+        # Use Google's generative AI for verification and summary
         api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
 
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
 
-        # Initialize orchestrator
+        # Model selection for summary/verification: Gemini 2.0 Flash Exp (3.0 equivalent)
+        # Browser automation uses 2.0 Flash (configured in agent_tasks.py)
+        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
+
+        # Initialize orchestrator (also uses 2.0 Flash Exp for classification/research)
         self.orchestrator = Orchestrator()
 
         # Load agent profiles for reference

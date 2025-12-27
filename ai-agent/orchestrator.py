@@ -196,7 +196,11 @@ class Orchestrator:
             raise ValueError("GOOGLE_API_KEY environment variable not set")
 
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash")
+
+        # Model selection:
+        # - Orchestration/Research: Gemini 2.0 Flash Exp (3.0 equivalent)
+        # - Browser automation uses 2.0 Flash (configured in agent_tasks.py)
+        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
 
         # Load agent profiles
         self.agent_loader = AgentLoader()
