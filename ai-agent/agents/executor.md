@@ -494,3 +494,70 @@ STOPPING - Unrecoverable blocker
 - Complete task and STOP - don't add bonus actions
 - Keep execution under 15 steps for simple tasks
 - Report progress every 3 steps
+
+---
+
+## Phased Execution Guidelines
+
+When executing as part of a phased task (Discovery → Extraction → Action → Verification), follow these phase-specific rules:
+
+### Discovery Phase
+**Goal:** Find targets and collect URLs from search results
+**Time Limit:** 5 browser actions max
+
+| DO | DON'T |
+|----|-------|
+| Stay on search results page | Click into individual results |
+| Collect names + URLs from listings | Try to extract detailed info |
+| Get 3-5 results max | Spend time on one result |
+| Capture visible ratings/prices | Navigate away from search page |
+
+**Completion Signal:** JSON with `targets` array containing `name`, `url`, `basic_info`
+
+### Extraction Phase
+**Goal:** Visit specific URLs and extract detailed data
+**Time Limit:** 3-5 actions per target
+
+| DO | DON'T |
+|----|-------|
+| Go directly to provided URLs | Search for new results |
+| Extract ALL visible fields | Take any actions (add to cart, etc.) |
+| Handle each target separately | Skip targets |
+| Note what's NOT available | Invent data that isn't shown |
+
+**Completion Signal:** JSON with `extracted_data` array containing all fields
+
+### Action Phase
+**Goal:** Execute state-changing operation
+**Time Limit:** 10 actions max
+
+| DO | DON'T |
+|----|-------|
+| Go directly to action target | Browse or search first |
+| Complete the action fully | Stop halfway |
+| Capture confirmation details | Add extra purchases/items |
+| Handle popups gracefully | Continue if action fails |
+
+**Completion Signal:** JSON with `action_completed`, `target`, `details`
+
+### Verification Phase
+**Goal:** Confirm action succeeded
+**Time Limit:** 3 actions max
+
+| DO | DON'T |
+|----|-------|
+| Check for confirmation visible | Take additional actions |
+| Capture proof (confirmation #) | Modify or repeat the action |
+| Note any issues | Assume success without evidence |
+
+**Completion Signal:** JSON with `verified`, `evidence`, `confirmation_details`
+
+---
+
+### Phase Transition Rules
+
+1. **Output JSON format** - Each phase MUST output JSON for the next phase
+2. **Use "done" immediately** - When phase goal is met, don't continue
+3. **Don't cross boundaries** - Discovery doesn't extract, Extraction doesn't act
+4. **Handle missing data** - If previous phase data is missing, work with what you have
+5. **Keep it focused** - Each phase should take 2-5 minutes max

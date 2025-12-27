@@ -657,12 +657,67 @@ class PhasedBrowserExecutor:
             os.environ["GOOGLE_API_KEY"] = api_key
         self.llm = ChatGoogle(model="gemini-2.0-flash")
 
-        # Load executor agent profile for enhancements
+        # Load executor agent profile for self-correction and verification rules
         self.agent_loader = AgentLoader()
+        self.executor_profile = None
         try:
             self.executor_profile = self.agent_loader.load_agent("executor")
+            logger.info("Loaded executor profile for browser enhancements")
         except FileNotFoundError:
-            self.executor_profile = None
+            logger.warning("Executor profile not found, using default behaviors")
+
+    def _get_executor_enhancements(self) -> str:
+        """
+        Extract key rules from the executor profile to inject into phase prompts.
+        This ensures clean, efficient browser automation.
+        """
+        if not self.executor_profile:
+            return self._get_default_enhancements()
+
+        enhancements = "\n=== BROWSER AUTOMATION RULES ===\n"
+
+        # Add self-correction rules
+        if self.executor_profile.self_correction:
+            enhancements += "\nSELF-CORRECTION:\n"
+            for scenario, steps in list(self.executor_profile.self_correction.items())[:3]:
+                if isinstance(steps, list):
+                    enhancements += f"• {scenario}: {', '.join(steps[:3])}\n"
+                else:
+                    enhancements += f"• {scenario}: {steps}\n"
+
+        # Add behavioral rules
+        if self.executor_profile.behavioral_rules:
+            do_rules = self.executor_profile.behavioral_rules.get('do', [])[:4]
+            dont_rules = self.executor_profile.behavioral_rules.get('dont', [])[:4]
+            if do_rules:
+                enhancements += "\nDO:\n" + "\n".join([f"✓ {r}" for r in do_rules]) + "\n"
+            if dont_rules:
+                enhancements += "\nDON'T:\n" + "\n".join([f"✗ {r}" for r in dont_rules]) + "\n"
+
+        return enhancements
+
+    def _get_default_enhancements(self) -> str:
+        """Default browser rules if executor profile is not available."""
+        return """
+=== BROWSER AUTOMATION RULES ===
+
+SELF-CORRECTION:
+• Element not found: Wait 2s, scroll, check for popups blocking
+• Action has no effect: Check if disabled, try waiting for JS
+• Page looks wrong: Verify URL, check for redirects
+
+DO:
+✓ Verify each action completed before proceeding
+✓ Dismiss popups/modals that appear
+✓ Wait for page to fully load (2-3s)
+✓ Use "done" action immediately when complete
+
+DON'T:
+✗ Retry same failed action more than 2 times
+✗ Continue past unrecoverable errors (CAPTCHA, login required)
+✗ Add extra steps beyond what's requested
+✗ Spend more than 30 seconds on any single action
+"""
 
     async def execute_phased(self, plan) -> PhasedExecutionResult:
         """
@@ -740,6 +795,9 @@ class PhasedBrowserExecutor:
         start_time = time.time()
 
         try:
+            # Inject executor profile enhancements for clean, efficient execution
+            enhanced_prompt = prompt + self._get_executor_enhancements()
+
             # Create fresh browser session for this phase
             browser_session = BrowserSession(
                 browser_profile=self.browser_profile,
@@ -747,7 +805,7 @@ class PhasedBrowserExecutor:
             )
 
             agent = Agent(
-                task=prompt,
+                task=enhanced_prompt,
                 llm=self.llm,
                 browser_session=browser_session,
             )
