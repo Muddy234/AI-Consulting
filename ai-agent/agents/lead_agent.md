@@ -143,14 +143,22 @@ OUTPUT YOUR ANALYSIS AS:
 ## Agent Selection Matrix
 
 ### Research Agents
-| Topic | Google (Baseline) | Specialty Agent |
-|-------|:-----------------:|:---------------:|
-| FOOD | ✓ Always | yelp_research |
-| TRAVEL | ✓ Always | tripadvisor_research |
-| BOOKS | ✓ Always | goodreads_research |
-| TECH | ✓ Always | wirecutter_research |
-| PRODUCTS | ✓ Always | amazon_research |
-| GENERAL | ✓ Always | (none) |
+| Topic | Google (Baseline) | Specialty Agent | Location Agent |
+|-------|:-----------------:|:---------------:|:--------------:|
+| FOOD | ✓ Always | yelp_research | google_maps (hours/busy) |
+| TRAVEL | ✓ Always | tripadvisor_research | google_maps (address/hours) |
+| BOOKS | ✓ Always | goodreads_research | - |
+| TECH | ✓ Always | wirecutter_research | - |
+| PRODUCTS | ✓ Always | amazon_research | google_maps (store hours) |
+| GENERAL | ✓ Always | (none) | google_maps (if location query) |
+
+### When to Include Google Maps
+Add `google_maps` agent when:
+- User asks about hours, busy times, or "when to go"
+- User needs exact address or directions context
+- User asks "is it open now" or "how busy is it"
+- Reservation planning (adds visit timing insights)
+- Any query mentioning "crowded", "wait time", "parking"
 
 ### Action Agents
 | Action Type | Agent |

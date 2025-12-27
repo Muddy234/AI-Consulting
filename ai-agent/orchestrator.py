@@ -74,6 +74,7 @@ class Topic(Enum):
     TECH = "tech"              # Electronics, gadgets, software
     PRODUCTS = "products"      # General shopping, products
     EMAIL = "email"            # Email and calendar
+    LOCATION = "location"      # Address, hours, busy times, directions
     GENERAL = "general"        # Doesn't fit specific category
 
     @classmethod
@@ -137,11 +138,11 @@ class UnifiedPlan:
 
 TOPIC_AGENT_MAP = {
     Topic.FOOD: {
-        "research": ["google_research", "yelp_research"],
+        "research": ["google_research", "yelp_research", "google_maps"],
         "action": ["opentable_reserve"]
     },
     Topic.TRAVEL: {
-        "research": ["google_research", "tripadvisor_research"],
+        "research": ["google_research", "tripadvisor_research", "google_maps"],
         "action": []
     },
     Topic.BOOKS: {
@@ -153,12 +154,16 @@ TOPIC_AGENT_MAP = {
         "action": ["amazon_cart"]
     },
     Topic.PRODUCTS: {
-        "research": ["google_research", "amazon_research"],
+        "research": ["google_research", "amazon_research", "google_maps"],
         "action": ["amazon_cart"]
     },
     Topic.EMAIL: {
         "research": [],
         "action": ["email_calendar"]
+    },
+    Topic.LOCATION: {
+        "research": ["google_research", "google_maps"],
+        "action": []
     },
     Topic.GENERAL: {
         "research": ["google_research"],
@@ -247,10 +252,13 @@ Classify this user request:
 Respond with JSON only:
 {{
     "intent": "research | action | hybrid",
-    "topic": "food | travel | books | tech | products | email | general",
+    "topic": "food | travel | books | tech | products | email | location | general",
     "confidence": "high | medium | low",
     "reasoning": "Brief explanation of classification"
 }}
+
+TOPIC HINTS:
+- location: hours, address, busy times, parking, "is it open", "how crowded"
 """
 
         try:
@@ -301,6 +309,10 @@ Respond with JSON only:
             topic = Topic.TECH
         elif any(w in request_lower for w in ['email', 'inbox', 'flagged', 'calendar', 'todo', 'outlook']):
             topic = Topic.EMAIL
+        elif any(w in request_lower for w in ['hours', 'open', 'closed', 'busy', 'crowded', 'wait time',
+                                               'address', 'location', 'directions', 'parking', 'near me',
+                                               'how busy', 'is it open', 'what time']):
+            topic = Topic.LOCATION
         elif any(w in request_lower for w in ['buy', 'purchase', 'amazon', 'product', 'cart']):
             topic = Topic.PRODUCTS
         else:
