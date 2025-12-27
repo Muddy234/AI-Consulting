@@ -8,8 +8,8 @@ Supports both Windows (Edge) and Raspberry Pi (Chromium).
 
 Model Configuration:
 - Browser automation: Gemini 2.0 Flash (stable for browser_use)
-- Orchestration/Research: Gemini 3.0 Flash - see orchestrator.py
-- Summary/Verification: Gemini 3.0 Flash - see task_planner.py
+- Orchestration/Research: Gemini 2.5 Flash - see orchestrator.py
+- Summary/Verification: Gemini 2.5 Flash - see task_planner.py
 """
 
 import os
@@ -107,7 +107,7 @@ class AgentTaskRunner:
 
         # LLM - Using Gemini 2.0 Flash for browser automation
         # NOTE: Keep at 2.0 Flash for browsing stability
-        # Orchestration/Research/Summary use Gemini 3.0 Flash in orchestrator.py
+        # Orchestration/Research/Summary use Gemini 2.5 Flash in orchestrator.py
         api_key = os.getenv("GOOGLE_API_KEY")
         if api_key:
             os.environ["GOOGLE_API_KEY"] = api_key

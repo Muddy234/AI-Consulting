@@ -147,11 +147,11 @@ class TaskPlanner:
 
         genai.configure(api_key=api_key)
 
-        # Model selection for summary/verification: Gemini 3.0 Flash
+        # Model selection for summary/verification: Gemini 2.5 Flash
         # Browser automation uses 2.0 Flash (configured in agent_tasks.py)
-        self.model = genai.GenerativeModel("gemini-3-flash")
+        self.model = genai.GenerativeModel("gemini-2.5-flash")
 
-        # Initialize orchestrator (also uses Gemini 3.0 Flash for classification/research)
+        # Initialize orchestrator (also uses Gemini 2.5 Flash for classification/research)
         self.orchestrator = Orchestrator()
 
         # Load agent profiles for reference
