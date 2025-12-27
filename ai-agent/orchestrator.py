@@ -239,8 +239,12 @@ Respond with JSON only:
             response = await self.model.generate_content_async(classification_prompt)
             result = self._parse_json(response.text)
 
-            intent = Intent(result.get("intent", "research"))
-            topic = Topic(result.get("topic", "general"))
+            # Handle case-insensitivity from LLM response
+            intent_str = result.get("intent", "research").lower()
+            topic_str = result.get("topic", "general").lower()
+
+            intent = Intent(intent_str)
+            topic = Topic(topic_str)
 
             return intent, topic
 
