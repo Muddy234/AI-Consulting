@@ -30,7 +30,7 @@ AGENTS_DIR = Path(__file__).parent / "agents"
 class AgentProfile:
     """Parsed agent profile from .md file."""
     name: str
-    role: str
+    role: str = ""
     scope_in: List[str] = field(default_factory=list)
     scope_out: List[str] = field(default_factory=list)
     mece_boundary: str = ""
