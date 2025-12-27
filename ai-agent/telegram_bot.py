@@ -119,7 +119,7 @@ class AIAgentBot:
 
             # Phase 2: Show plan summary to user
             plan_summary = self._format_plan_summary(plan)
-            await update.message.reply_text(plan_summary, parse_mode='Markdown')
+            await update.message.reply_text(plan_summary)
 
             # Phase 3: Execute with enhanced prompt
             await update.message.reply_text("🚀 Executing plan...")
@@ -146,40 +146,50 @@ class AIAgentBot:
             logger.error(f"Error in plan_and_execute: {e}")
             return {"status": "error", "message": str(e)}
 
+    def _escape_markdown(self, text: str) -> str:
+        """Escape special markdown characters for Telegram."""
+        # Characters that need escaping in Telegram Markdown
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in special_chars:
+            text = text.replace(char, '\\' + char)
+        return text
+
     def _format_plan_summary(self, plan) -> str:
         """Format a plan into a readable summary for Telegram."""
         # Show agents being used (from new orchestrator)
         agents_text = ""
         if plan.unified_plan and plan.unified_plan.agents_used:
             agents_list = ", ".join(plan.unified_plan.agents_used)
-            agents_text = f"\n**Agents:** {agents_list}"
+            agents_text = f"\nAgents: {agents_list}"
             intent_topic = f" ({plan.unified_plan.intent.value} / {plan.unified_plan.topic.value})"
         else:
             intent_topic = ""
 
-        steps_text = "\n".join([f"  {s.step_number}. {s.action}" for s in plan.steps[:5]])
+        # Escape dynamic content to prevent markdown errors
+        goal = plan.interpreted_goal.replace('*', '').replace('_', '').replace('`', '')
+        steps_text = "\n".join([f"  {s.step_number}. {s.action.replace('*', '').replace('_', '')}" for s in plan.steps[:5]])
         if len(plan.steps) > 5:
             steps_text += f"\n  ... and {len(plan.steps) - 5} more steps"
 
-        criteria_text = "\n".join([f"  ✓ {c}" for c in plan.success_criteria[:3]])
+        criteria_text = "\n".join([f"  - {c.replace('*', '').replace('_', '')}" for c in plan.success_criteria[:3]])
 
         issues_text = ""
         if plan.potential_issues:
             top_issues = [i for i in plan.potential_issues if i.likelihood in ["high", "medium"]][:2]
             if top_issues:
-                issues_text = "\n\n⚠️ **Watching for:**\n" + "\n".join([f"  • {i.issue}" for i in top_issues])
+                issues_text = "\n\nWatching for:\n" + "\n".join([f"  - {i.issue.replace('*', '').replace('_', '')}" for i in top_issues])
 
-        return f"""📋 **Task Plan** (ID: {plan.task_id}){intent_topic}
+        return f"""Task Plan (ID: {plan.task_id}){intent_topic}
 
-**Goal:** {plan.interpreted_goal}{agents_text}
+Goal: {goal}{agents_text}
 
-**Steps:**
+Steps:
 {steps_text}
 
-**Success Criteria:**
+Success Criteria:
 {criteria_text}
 
-**Estimated Time:** {plan.estimated_duration}{issues_text}
+Estimated Time: {plan.estimated_duration}{issues_text}
 """
 
     async def send_unauthorized_message(self, update: Update):
