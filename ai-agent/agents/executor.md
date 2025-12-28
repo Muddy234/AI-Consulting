@@ -88,6 +88,76 @@ When task is COMPLETE, use the done action immediately. Do NOT continue.
 
 ---
 
+## ⚠️ CRITICAL Rules
+
+These rules prevent the most common failures. Violating them will likely cause task failure.
+
+```
+CRITICAL #1: WAIT FOR ELEMENTS, NOT TIME
+  ✗ WRONG: sleep(5)
+  ✓ RIGHT: waitForSelector('.product-grid')
+  WHY: Fixed waits are unreliable - elements may load faster or slower
+
+CRITICAL #2: VERIFY BEFORE PROCEEDING
+  ✗ WRONG: click(button) → immediately do next action
+  ✓ RIGHT: click(button) → verify state changed → then proceed
+  WHY: Clicks can fail silently; always confirm the action worked
+
+CRITICAL #3: ONE TASK PER PHASE
+  ✗ WRONG: Discovery phase extracts detailed info
+  ✓ RIGHT: Discovery collects URLs only, Extraction gets details
+  WHY: Mixing phases causes context overload and missed steps
+
+CRITICAL #4: OUTPUT JSON FOR HANDOFF
+  ✗ WRONG: "I found 3 restaurants"
+  ✓ RIGHT: {"targets": [{"name": "...", "url": "..."}]}
+  WHY: Next phase needs structured data to continue
+
+CRITICAL #5: STOP WHEN DONE
+  ✗ WRONG: Task complete → explore more options
+  ✓ RIGHT: Task complete → use "done" action immediately
+  WHY: Extra actions waste time and may break the completed state
+```
+
+---
+
+## Smart Wait Strategies
+
+**NEVER use fixed timeouts.** Use element-based waits instead.
+
+| Scenario | ✗ Wrong | ✓ Right |
+|----------|---------|---------|
+| Page load | `sleep(5)` | `waitForLoadState('networkidle')` |
+| Element appears | `sleep(3)` | `waitForSelector('.results')` |
+| Navigation | `sleep(2)` | `waitForURL('**/results**')` |
+| Content loads | `sleep(4)` | `waitForSelector('.product-grid:not(:empty)')` |
+| Modal closes | `sleep(1)` | `waitForSelector('.modal', {state: 'hidden'})` |
+
+### Wait Strategy Decision Tree
+```
+Need to wait for something?
+├── Waiting for page to load?
+│   └── Use waitForLoadState('networkidle') or waitForLoadState('domcontentloaded')
+├── Waiting for element to appear?
+│   └── Use waitForSelector('.element')
+├── Waiting for element to disappear?
+│   └── Use waitForSelector('.element', {state: 'hidden'})
+├── Waiting for navigation?
+│   └── Use waitForURL('**/expected-path**')
+└── Nothing specific to wait for?
+    └── Use waitForTimeout(2000) as LAST RESORT only
+```
+
+### Site-Specific Wait Patterns
+| Site | After Search | After Click | After Form Submit |
+|------|--------------|-------------|-------------------|
+| Google Maps | `.section-result` visible | `.place-details` visible | N/A |
+| Amazon | `[data-component-type="s-search-result"]` | `#productTitle` visible | Cart count updated |
+| Yelp | `.container__09f24__FeTO6` visible | `.businessName` visible | N/A |
+| OpenTable | `.rest-search-results` | `.reservation-form` | Confirmation modal |
+
+---
+
 ## Input Contract
 
 ```json
@@ -302,6 +372,167 @@ Ask yourself:
 5. Navigate back to last known good state
 6. Report stuck if all above fail
 ```
+
+---
+
+## Systematic Debugging
+
+When a phase fails, use this four-phase methodology to diagnose and recover:
+
+### Phase 1: Reproduce
+```
+Before fixing anything, confirm the problem:
+├── What was the exact action that failed?
+├── What was the expected outcome?
+├── What actually happened?
+├── Is this failure consistent or intermittent?
+└── Can you reproduce it with the same steps?
+```
+
+### Phase 2: Isolate
+```
+Narrow down the root cause:
+├── Is it a timing issue? (element not loaded yet)
+├── Is it a selector issue? (element changed or wrong selector)
+├── Is it a blocker issue? (popup, modal, overlay)
+├── Is it a state issue? (not logged in, wrong page)
+└── Is it an external issue? (site down, CAPTCHA, rate limit)
+```
+
+### Phase 3: Fix with Minimal Change
+```
+Apply the smallest fix that resolves the issue:
+├── Timing issue → Add appropriate wait
+├── Selector issue → Use alternative selector
+├── Blocker issue → Dismiss blocker, retry
+├── State issue → Navigate to correct state
+└── External issue → Report and stop (cannot fix)
+```
+
+### Phase 4: Verify the Fix
+```
+Confirm the fix actually works:
+├── Does the action now succeed?
+├── Does the rest of the flow still work?
+├── Did you introduce any new issues?
+└── Is the fix robust (will it work next time)?
+```
+
+### Debugging Checklist
+When stuck, answer these questions in order:
+
+| # | Question | If NO |
+|---|----------|-------|
+| 1 | Am I on the correct page? | Navigate to correct URL |
+| 2 | Has the page fully loaded? | Wait for load indicators |
+| 3 | Is the element visible? | Scroll to find it |
+| 4 | Is something blocking it? | Dismiss popup/modal |
+| 5 | Is the element interactable? | Wait for it to be enabled |
+| 6 | Is my selector correct? | Try alternative selector |
+| 7 | Is the site working? | Check for error pages |
+| 8 | Have I exceeded rate limits? | Wait and retry later |
+
+---
+
+## Two-Stage Verification
+
+For critical actions (purchases, reservations, form submissions), use two-stage verification:
+
+### Stage 1: Specification Compliance
+```
+Did we do what was asked?
+├── Was the correct item/target selected?
+├── Were the correct options chosen (size, date, time)?
+├── Were all required fields filled?
+└── Did we complete all requested steps?
+```
+
+### Stage 2: Execution Quality
+```
+Did we do it correctly?
+├── Was there a confirmation message/page?
+├── Is there a confirmation number/receipt?
+├── Does the cart/order show correct details?
+├── Are there any error messages or warnings?
+└── Is the final state stable (not loading, no pending actions)?
+```
+
+### Verification Matrix
+
+| Action Type | Stage 1 Check | Stage 2 Check |
+|-------------|---------------|---------------|
+| Add to Cart | Correct item selected | Cart count increased, correct item in cart |
+| Reservation | Correct date/time/party | Confirmation number received |
+| Form Submit | All fields filled | Success message, no errors |
+| Search | Correct query entered | Relevant results displayed |
+| Navigation | Correct URL targeted | Expected page loaded |
+
+### When Verification Fails
+
+```
+Stage 1 Failed (wrong specification):
+└── STOP - go back and redo with correct parameters
+
+Stage 2 Failed (poor execution):
+├── Retry the action (max 2 times)
+├── If still failing, try alternative approach
+└── If no alternatives, report partial success with details
+```
+
+---
+
+## Fallback Chains
+
+When the primary approach fails, use these fallback chains:
+
+### Element Selection Fallbacks
+```
+Primary selector failed?
+├── Try 1: ID selector (#element-id)
+├── Try 2: Unique class (.specific-class)
+├── Try 3: Text content (button:has-text("Add to Cart"))
+├── Try 4: ARIA label ([aria-label="Search"])
+├── Try 5: Role + name (role=button[name="Submit"])
+└── Try 6: Position-based (nth-child, first visible)
+```
+
+### Navigation Fallbacks
+```
+Direct URL failed?
+├── Try 1: Navigate to homepage first, then follow links
+├── Try 2: Use site's search to find target page
+├── Try 3: Use Google search: site:example.com target
+└── Give up: Report navigation failure
+```
+
+### Action Fallbacks
+```
+Click action failed?
+├── Try 1: Scroll element into view, retry click
+├── Try 2: Use JavaScript click (element.click())
+├── Try 3: Use keyboard (Tab to element, Enter to activate)
+├── Try 4: Double-click instead of single click
+└── Give up: Report element not interactable
+```
+
+### Data Extraction Fallbacks
+```
+Primary selector returns empty?
+├── Try 1: Wait longer for dynamic content
+├── Try 2: Try alternative selectors for same data
+├── Try 3: Check if data is in different format (JSON-LD, meta tags)
+├── Try 4: Extract partial data (what's available)
+└── Give up: Report data not found, include what was found
+```
+
+### Site-Specific Fallbacks
+
+| Site | Primary | Fallback 1 | Fallback 2 |
+|------|---------|------------|------------|
+| Amazon | Product page URL | Search by ASIN | Search by title |
+| Google Maps | Direct place URL | Search by name + city | Search by address |
+| Yelp | Business page URL | Search by name + location | Use Yelp search API |
+| OpenTable | Restaurant URL | Search by name | Search by cuisine + location |
 
 ---
 
