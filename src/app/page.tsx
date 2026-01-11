@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useFinancialStore } from '@/lib/store/financialStore';
 import InputCards from '@/components/InputCards';
 import Dashboard from '@/components/Dashboard';
@@ -8,10 +8,13 @@ import Dashboard from '@/components/Dashboard';
 export default function Home() {
   const [view, setView] = useState<'loading' | 'input' | 'dashboard'>('loading');
   const { snapshot, _hasHydrated } = useFinancialStore();
+  const initialViewSet = useRef(false);
 
-  // Wait for hydration, then decide which view to show
+  // Wait for hydration, then decide initial view based on existing data
+  // Only runs once when hydration completes
   useEffect(() => {
-    if (_hasHydrated) {
+    if (_hasHydrated && !initialViewSet.current) {
+      initialViewSet.current = true;
       if (snapshot.grossAnnualIncome > 0) {
         setView('dashboard');
       } else {
