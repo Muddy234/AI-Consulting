@@ -1,0 +1,197 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark Mode Base */
+  --background: #1E1E2E;
+  --background-secondary: #262637;
+  --background-card: #2A2A3C;
+
+  /* Brand Colors */
+  --navy: #1B264F;
+  --navy-light: #2A3A6B;
+  --gold: #E5A823;
+  --gold-hover: #F5B833;
+
+  /* Text Colors */
+  --foreground: #F5F5F5;
+  --text-muted: #A0A0B0;
+  --text-dim: #6B6B7B;
+
+  /* Status Colors */
+  --success: #22C55E;
+  --success-bg: rgba(34, 197, 94, 0.15);
+  --warning: #F59E0B;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  --danger: #EF4444;
+  --danger-bg: rgba(239, 68, 68, 0.15);
+
+  /* Borders & Shadows */
+  --border: #3A3A4C;
+  --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
+
+  /* Sizing */
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-navy: var(--navy);
+  --color-gold: var(--gold);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Roboto Slab', Georgia, serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Roboto Slab', Georgia, serif;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--foreground);
+}
+
+/* Card Component */
+.card {
+  background: var(--background-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+
+/* Button Base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.btn-primary {
+  background-color: var(--gold);
+  color: var(--navy);
+  border-color: var(--gold);
+}
+
+.btn-primary:hover {
+  background-color: transparent;
+  color: var(--gold);
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background-color: var(--navy);
+  color: var(--foreground);
+  border-color: var(--navy);
+}
+
+.btn-secondary:hover {
+  background-color: var(--navy-light);
+  transform: translateY(-2px);
+}
+
+/* Form Inputs */
+input, select {
+  background: var(--background-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  color: var(--foreground);
+  font-size: 1rem;
+  width: 100%;
+  transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+input::placeholder {
+  color: var(--text-dim);
+}
+
+/* Labels */
+label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+/* Status Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.badge-warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.badge-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* Progress Bar */
+.progress-bar {
+  height: 8px;
+  background: var(--background-secondary);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-hover));
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+}
