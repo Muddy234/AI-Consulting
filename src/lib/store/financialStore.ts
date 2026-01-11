@@ -13,17 +13,19 @@ import { getStrategy } from '@/lib/engine/strategies';
 
 interface FinancialState {
   // User data
-  birthYear: number;
+  currentAge: number;
+  targetRetirementAge: number;
   strategy: StrategyType;
   snapshot: FinancialSnapshot;
 
-  // Computed (cached for performance)
+  // Computed
   currentSteps: FinancialStep[];
   nextStep: FinancialStep | null;
 
   // Actions
   setStrategy: (strategy: StrategyType) => void;
-  setBirthYear: (year: number) => void;
+  setAge: (age: number) => void;
+  setTargetRetirementAge: (age: number) => void;
   updateSnapshot: (updates: Partial<FinancialSnapshot>) => void;
   addDebt: (debt: Debt) => void;
   updateDebt: (id: string, updates: Partial<Debt>) => void;
@@ -32,7 +34,6 @@ interface FinancialState {
   recalculate: () => void;
 }
 
-// Helper to recalculate steps
 const calculateSteps = (strategy: StrategyType, snapshot: FinancialSnapshot) => {
   const engine = getStrategy(strategy);
   const steps = engine.getSteps(snapshot);
@@ -43,24 +44,23 @@ const calculateSteps = (strategy: StrategyType, snapshot: FinancialSnapshot) => 
 export const useFinancialStore = create<FinancialState>()(
   persist(
     (set, get) => ({
-      // Initial state
-      birthYear: 1990,
+      currentAge: 30,
+      targetRetirementAge: 65,
       strategy: 'FOO',
       snapshot: createDefaultSnapshot(),
       currentSteps: [],
       nextStep: null,
 
-      // Set strategy and recalculate
       setStrategy: (strategy) => {
         const { snapshot } = get();
         const { steps, nextStep } = calculateSteps(strategy, snapshot);
         set({ strategy, currentSteps: steps, nextStep });
       },
 
-      // Set birth year
-      setBirthYear: (year) => set({ birthYear: year }),
+      setAge: (age) => set({ currentAge: age }),
 
-      // Update snapshot and recalculate
+      setTargetRetirementAge: (age) => set({ targetRetirementAge: age }),
+
       updateSnapshot: (updates) => {
         const { strategy, snapshot } = get();
         const newSnapshot = { ...snapshot, ...updates };
@@ -68,7 +68,6 @@ export const useFinancialStore = create<FinancialState>()(
         set({ snapshot: newSnapshot, currentSteps: steps, nextStep });
       },
 
-      // Add a debt
       addDebt: (debt) => {
         const { strategy, snapshot } = get();
         const newDebts = [...snapshot.debts, debt];
@@ -77,7 +76,6 @@ export const useFinancialStore = create<FinancialState>()(
         set({ snapshot: newSnapshot, currentSteps: steps, nextStep });
       },
 
-      // Update a debt
       updateDebt: (id, updates) => {
         const { strategy, snapshot } = get();
         const newDebts = snapshot.debts.map(d =>
@@ -88,7 +86,6 @@ export const useFinancialStore = create<FinancialState>()(
         set({ snapshot: newSnapshot, currentSteps: steps, nextStep });
       },
 
-      // Remove a debt
       removeDebt: (id) => {
         const { strategy, snapshot } = get();
         const newDebts = snapshot.debts.filter(d => d.id !== id);
@@ -97,12 +94,12 @@ export const useFinancialStore = create<FinancialState>()(
         set({ snapshot: newSnapshot, currentSteps: steps, nextStep });
       },
 
-      // Reset everything
       resetAll: () => {
         const defaultSnapshot = createDefaultSnapshot();
         const { steps, nextStep } = calculateSteps('FOO', defaultSnapshot);
         set({
-          birthYear: 1990,
+          currentAge: 30,
+          targetRetirementAge: 65,
           strategy: 'FOO',
           snapshot: defaultSnapshot,
           currentSteps: steps,
@@ -110,7 +107,6 @@ export const useFinancialStore = create<FinancialState>()(
         });
       },
 
-      // Manual recalculation trigger
       recalculate: () => {
         const { strategy, snapshot } = get();
         const { steps, nextStep } = calculateSteps(strategy, snapshot);
@@ -119,13 +115,12 @@ export const useFinancialStore = create<FinancialState>()(
     }),
     {
       name: 'financial-gps-storage',
-      // Only persist user data, not computed values
       partialize: (state) => ({
-        birthYear: state.birthYear,
+        currentAge: state.currentAge,
+        targetRetirementAge: state.targetRetirementAge,
         strategy: state.strategy,
         snapshot: state.snapshot,
       }),
-      // Recalculate on hydration
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.recalculate();

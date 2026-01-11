@@ -1,197 +1,208 @@
 @import "tailwindcss";
 
 :root {
-  /* Dark Mode Base */
-  --background: #1E1E2E;
-  --background-secondary: #262637;
-  --background-card: #2A2A3C;
+  /* Dark Mode Base - Deeper, richer */
+  --background: #0A0A0B;
+  --background-card: #141416;
+  --background-input: #1C1C1F;
 
   /* Brand Colors */
-  --navy: #1B264F;
-  --navy-light: #2A3A6B;
   --gold: #E5A823;
-  --gold-hover: #F5B833;
+  --gold-soft: rgba(229, 168, 35, 0.12);
 
   /* Text Colors */
-  --foreground: #F5F5F5;
-  --text-muted: #A0A0B0;
-  --text-dim: #6B6B7B;
+  --foreground: #FAFAFA;
+  --text-secondary: #8E8E93;
+  --text-dim: #48484A;
 
-  /* Status Colors */
-  --success: #22C55E;
-  --success-bg: rgba(34, 197, 94, 0.15);
-  --warning: #F59E0B;
-  --warning-bg: rgba(245, 158, 11, 0.15);
-  --danger: #EF4444;
-  --danger-bg: rgba(239, 68, 68, 0.15);
+  /* Status */
+  --success: #30D158;
+  --danger: #FF453A;
 
-  /* Borders & Shadows */
-  --border: #3A3A4C;
-  --shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.4);
-
-  /* Sizing */
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* Borders & Effects */
+  --border: #2C2C2E;
+  --radius: 24px;
+  --radius-sm: 16px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-navy: var(--navy);
-  --color-gold: var(--gold);
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Roboto Slab', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  line-height: 1.6;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography */
-h1, h2, h3, h4, h5, h6 {
-  font-family: 'Roboto Slab', Georgia, serif;
-  font-weight: 700;
-  line-height: 1.2;
+/* Typography - Clean, no serifs */
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--foreground);
 }
 
-/* Card Component */
+h1 { font-size: 2.25rem; line-height: 1.2; }
+h2 { font-size: 1.5rem; line-height: 1.3; }
+h3 { font-size: 1.125rem; }
+
+/* Card - Large radius, subtle */
 .card {
   background: var(--background-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-}
-
-/* Button Base */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
   border-radius: var(--radius);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 2px solid transparent;
+  padding: 2rem;
 }
 
-.btn-primary {
-  background-color: var(--gold);
-  color: var(--navy);
-  border-color: var(--gold);
-}
-
-.btn-primary:hover {
-  background-color: transparent;
-  color: var(--gold);
-  transform: translateY(-2px);
-}
-
-.btn-secondary {
-  background-color: var(--navy);
-  color: var(--foreground);
-  border-color: var(--navy);
-}
-
-.btn-secondary:hover {
-  background-color: var(--navy-light);
-  transform: translateY(-2px);
-}
-
-/* Form Inputs */
+/* Input Fields - Seamless */
 input, select {
-  background: var(--background-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
+  background: var(--background-input);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.25rem;
   color: var(--foreground);
-  font-size: 1rem;
+  font-size: 1.125rem;
   width: 100%;
-  transition: border-color 0.2s ease;
+  transition: box-shadow 0.15s ease;
 }
 
 input:focus, select:focus {
   outline: none;
-  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft), 0 0 0 1px var(--gold);
 }
 
 input::placeholder {
   color: var(--text-dim);
 }
 
-/* Labels */
 label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-muted);
-  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-/* Status Badges */
-.badge {
+/* Buttons - Rounded, bold */
+.btn {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 9999px;
-  font-size: 0.75rem;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  font-size: 1rem;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  text-decoration: none;
 }
 
-.badge-success {
-  background: var(--success-bg);
-  color: var(--success);
+.btn-primary {
+  background: var(--gold);
+  color: #000;
 }
 
-.badge-warning {
-  background: var(--warning-bg);
-  color: var(--warning);
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
 }
 
-.badge-danger {
-  background: var(--danger-bg);
-  color: var(--danger);
+.btn-secondary {
+  background: var(--background-input);
+  color: var(--foreground);
 }
 
-/* Progress Bar */
-.progress-bar {
-  height: 8px;
-  background: var(--background-secondary);
-  border-radius: 9999px;
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.75rem 1.25rem;
+}
+
+.btn-ghost:hover {
+  color: var(--foreground);
+  background: var(--background-input);
+}
+
+/* Progress Bar - Thin, elegant */
+.progress-track {
+  height: 4px;
+  background: var(--background-input);
+  border-radius: 999px;
   overflow: hidden;
 }
 
-.progress-bar-fill {
+.progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--gold), var(--gold-hover));
-  border-radius: 9999px;
+  background: var(--gold);
+  border-radius: 999px;
   transition: width 0.5s ease;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+/* Large Progress - For hero sections */
+.progress-lg .progress-track {
   height: 8px;
 }
 
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-gold {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+/* Scrollbar - Nearly invisible */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
 ::-webkit-scrollbar-track {
-  background: var(--background-secondary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: var(--text-dim);
+  border-radius: 3px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dim);
+/* Utility */
+.text-gold { color: var(--gold); }
+.text-secondary { color: var(--text-secondary); }
+.text-dim { color: var(--text-dim); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease forwards;
 }
