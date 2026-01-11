@@ -7,22 +7,18 @@ import Dashboard from '@/components/Dashboard';
 
 export default function Home() {
   const [view, setView] = useState<'loading' | 'input' | 'dashboard'>('loading');
-  const { snapshot, recalculate } = useFinancialStore();
+  const { snapshot, _hasHydrated } = useFinancialStore();
 
+  // Wait for hydration, then decide which view to show
   useEffect(() => {
-    recalculate();
-    if (snapshot.grossAnnualIncome > 0) {
-      setView('dashboard');
-    } else {
-      setView('input');
+    if (_hasHydrated) {
+      if (snapshot.grossAnnualIncome > 0) {
+        setView('dashboard');
+      } else {
+        setView('input');
+      }
     }
-  }, []);
-
-  useEffect(() => {
-    if (view === 'loading' && snapshot.grossAnnualIncome > 0) {
-      setView('dashboard');
-    }
-  }, [snapshot.grossAnnualIncome, view]);
+  }, [_hasHydrated, snapshot.grossAnnualIncome]);
 
   if (view === 'loading') {
     return (

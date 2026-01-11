@@ -12,6 +12,10 @@ import {
 import { getStrategy } from '@/lib/engine/strategies';
 
 interface FinancialState {
+  // Hydration state
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+
   // User data
   currentAge: number;
   targetRetirementAge: number;
@@ -44,6 +48,10 @@ const calculateSteps = (strategy: StrategyType, snapshot: FinancialSnapshot) => 
 export const useFinancialStore = create<FinancialState>()(
   persist(
     (set, get) => ({
+      // Hydration tracking
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+
       currentAge: 30,
       targetRetirementAge: 65,
       strategy: 'FOO',
@@ -124,6 +132,7 @@ export const useFinancialStore = create<FinancialState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.recalculate();
+          state.setHasHydrated(true);
         }
       },
     }
