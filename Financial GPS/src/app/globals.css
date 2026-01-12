@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+:root {
+  /* Dark Mode Base - Deeper, richer */
+  --background: #0A0A0B;
+  --background-card: #141416;
+  --background-input: #1C1C1F;
+
+  /* Brand Colors */
+  --gold: #E5A823;
+  --gold-soft: rgba(229, 168, 35, 0.12);
+
+  /* Text Colors */
+  --foreground: #FAFAFA;
+  --text-secondary: #8E8E93;
+  --text-dim: #48484A;
+
+  /* Status */
+  --success: #30D158;
+  --danger: #FF453A;
+
+  /* Borders & Effects */
+  --border: #2C2C2E;
+  --radius: 24px;
+  --radius-sm: 16px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography - Clean, no serifs */
+h1, h2, h3 {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--foreground);
+}
+
+h1 { font-size: 2.25rem; line-height: 1.2; }
+h2 { font-size: 1.5rem; line-height: 1.3; }
+h3 { font-size: 1.125rem; }
+
+/* Card - Large radius, subtle */
+.card {
+  background: var(--background-card);
+  border-radius: var(--radius);
+  padding: 2rem;
+}
+
+/* Input Fields - Seamless */
+input, select {
+  background: var(--background-input);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 1rem 1.25rem;
+  color: var(--foreground);
+  font-size: 1.125rem;
+  width: 100%;
+  transition: box-shadow 0.15s ease;
+}
+
+input:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--gold-soft), 0 0 0 1px var(--gold);
+}
+
+input::placeholder {
+  color: var(--text-dim);
+}
+
+label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Buttons - Rounded, bold */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--gold);
+  color: #000;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: scale(1.02);
+}
+
+.btn-secondary {
+  background: var(--background-input);
+  color: var(--foreground);
+}
+
+.btn-secondary:hover {
+  background: var(--border);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.75rem 1.25rem;
+}
+
+.btn-ghost:hover {
+  color: var(--foreground);
+  background: var(--background-input);
+}
+
+/* Progress Bar - Thin, elegant */
+.progress-track {
+  height: 4px;
+  background: var(--background-input);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+/* Large Progress - For hero sections */
+.progress-lg .progress-track {
+  height: 8px;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge-gold {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+/* Scrollbar - Nearly invisible */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-dim);
+  border-radius: 3px;
+}
+
+/* Utility */
+.text-gold { color: var(--gold); }
+.text-secondary { color: var(--text-secondary); }
+.text-dim { color: var(--text-dim); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in {
+  animation: fadeIn 0.3s ease forwards;
+}

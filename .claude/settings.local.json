@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(cmd.exe /c \"cd /d \"\"c:\\\\Users\\\\NateMcBride\\\\OneDrive - Arete Collective, L.P\\\\Documents\\\\AI-Consulting\"\" && npm install\")",
+      "Bash(cmd.exe /c \"cd /d \"\"c:\\\\Users\\\\NateMcBride\\\\OneDrive - Arete Collective, L.P\\\\Documents\\\\AI-Consulting\"\" && dir node_modules /b 2>nul | find /c /v \"\"\"\"\")",
+      "Bash(cmd.exe /c \"cd /d \"\"c:\\\\Users\\\\NateMcBride\\\\OneDrive - Arete Collective, L.P\\\\Documents\\\\AI-Consulting\"\" && if exist node_modules \\(echo EXISTS\\) else \\(echo NOT_FOUND\\)\")",
+      "Bash(cmd.exe /c \"cd /d \"\"c:\\\\Users\\\\NateMcBride\\\\OneDrive - Arete Collective, L.P\\\\Documents\\\\AI-Consulting\"\" && npm run dev\")",
+      "Bash(powershell.exe -Command \"Set-Location ''c:\\\\Users\\\\NateMcBride\\\\OneDrive - Arete Collective, L.P\\\\Documents\\\\AI-Consulting''; npm run dev\")"
+    ]
+  }
+}
