@@ -19,12 +19,18 @@ export default function Dashboard({ onEdit }: { onEdit: () => void }) {
     currentAge,
     targetRetirementAge,
     recalculate,
+    resetAll,
   } = useFinancialStore();
 
   // Ensure steps are calculated when dashboard mounts
   useEffect(() => {
-    recalculate();
-  }, [recalculate]);
+    // Small delay to ensure store is ready
+    const timer = setTimeout(() => {
+      recalculate();
+    }, 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-US', {
@@ -204,6 +210,28 @@ export default function Dashboard({ onEdit }: { onEdit: () => void }) {
             </p>
           </div>
         )}
+
+        {/* Debug Info - Remove in production */}
+        <div className="card mb-8 text-xs font-mono">
+          <h3 className="mb-2 text-secondary">Debug Data</h3>
+          <div className="space-y-1 text-dim">
+            <p>Income: ${snapshot.grossAnnualIncome}</p>
+            <p>Monthly Expenses: ${snapshot.monthlyExpenses}</p>
+            <p>Emergency Fund: ${snapshot.emergencyFund}</p>
+            <p>Retirement Balance: ${snapshot.retirementBalance}</p>
+            <p>Contribution %: {snapshot.contributionPercent}%</p>
+            <p>Debts: {snapshot.debts.length}</p>
+            <p>Strategy: {strategy}</p>
+            <p>Next Step: {nextStep ? nextStep.title : 'null'}</p>
+            <p>Age: {currentAge} → {targetRetirementAge}</p>
+          </div>
+          <button
+            onClick={() => { resetAll(); onEdit(); }}
+            className="mt-4 text-danger underline"
+          >
+            Reset All Data
+          </button>
+        </div>
 
         {/* Footer */}
         <p className="text-center text-dim text-sm mt-10">
