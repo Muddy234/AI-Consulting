@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useFinancialStore } from '@/lib/store/financialStore';
 import { StrategyType } from '@/types/financial';
 
@@ -17,7 +18,13 @@ export default function Dashboard({ onEdit }: { onEdit: () => void }) {
     nextStep,
     currentAge,
     targetRetirementAge,
+    recalculate,
   } = useFinancialStore();
+
+  // Ensure steps are calculated when dashboard mounts
+  useEffect(() => {
+    recalculate();
+  }, [recalculate]);
 
   const formatCurrency = (n: number) =>
     new Intl.NumberFormat('en-US', {

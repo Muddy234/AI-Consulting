@@ -130,18 +130,21 @@ export const useFinancialStore = create<FinancialState>()(
         snapshot: state.snapshot,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          // Recalculate steps using the rehydrated state
-          const { steps, nextStep } = calculateSteps(state.strategy, state.snapshot);
-          // Use setTimeout to ensure store is ready before setting
-          setTimeout(() => {
+        // Use setTimeout to ensure store is ready before setting
+        setTimeout(() => {
+          if (state) {
+            // Recalculate steps using the rehydrated state
+            const { steps, nextStep } = calculateSteps(state.strategy, state.snapshot);
             useFinancialStore.setState({
               currentSteps: steps,
               nextStep,
               _hasHydrated: true
             });
-          }, 0);
-        }
+          } else {
+            // First-time user - no stored data, just mark as hydrated
+            useFinancialStore.setState({ _hasHydrated: true });
+          }
+        }, 0);
       },
     }
   )
