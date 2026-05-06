@@ -1,242 +1,445 @@
-# Objective Refactor — Implementation Plan
+# Objective Refactor — Implementation Plan (rev 2)
 
-**Status:** Draft, awaiting user review
+**Status:** Revised draft, awaiting user review
 **Scope:** Ember Crown world only. Architecture must generalize to future worlds without redesign.
-**Goal:** Replace scripted-beat narrative with objective-driven open improvisation. Add visible clock, move budget, multi-axis state, risk-gated lethality.
+**Goal:** Replace scripted-beat narrative with a living-world simulator under an objective-driven story. Single visible clock; earned-HUD threat meters; scheduled-event counterfactuals; hyperlinked prose for selective revelation.
+
+### What changed from rev 1
+
+Removed (made the game readable, not exciting):
+- Pre-disclosed cost numbers per choice (`predictedDistanceDelta`, `predictedClockHours`)
+- Stake clause and risk-badge UI (turned tension into spreadsheet play)
+- `movesRemaining` budget (redundant with the hours clock)
+- Generic 0–4 `heat` meter (replaced by named, earnable threat meters)
+- 2x2 mood-quadrant choice metadata
+- `selfOtherSum` / `assertYieldSum` hidden quadrant ending math
+- HUD widgets for distance, heat, assets, moves
+
+Added (the world is alive whether or not you're watching):
+- Living-world simulator: `worldState` (always true, always ticked) vs. `playerKnowledge` (curated subset surfaced through prose / hyperlinks)
+- Three-tier event taxonomy: macro-threat / scene-event / silent simulation
+- Authored-tentpole + engine-generated scheduled events with preconditions (for counterfactuals — good and bad)
+- Diegetic consequence revelation (delayed, indirect; player draws the causal chain)
+- Earned-HUD threat meters (only render when player has learned of the threat)
+- Hyperlinked prose with typed links (lore / clue / flavor / threat-reveal / npc-detail / investigation); some cost in-fiction time
+- Threat-slowing player actions (`desperate` choices can push back antagonist progress)
+
+Retained from rev 1:
+- 96-hour primary clock
+- Lethality gate (with refinement: only *terminal* outcomes require `desperate`; non-lethal surprises allowed on controlled/risky)
+- Risk tag on choices (engine-internal only; not styled in UI)
+- `condition` chip; `assets` (including relationship-style entries like `ally:sera`)
 
 ---
 
 ## 1. Design Contract
 
 ### 1.1 Player-facing premise
-- King Aldric is dying. You must reach his bedside before he does — or Halric crowns a puppet.
-- You have **15 moves** and **96 in-fiction hours** to do it.
-- Every choice changes some combination of distance, clock, condition, heat, or assets.
-- The game ends one of five ways:
-  1. **Reached the king** — `distanceToKing ≤ 5` (multiple ending shapes based on accumulated mood/state)
-  2. **Clock expired** — `clockHours ≤ 0`
-  3. **Moves exhausted** — `movesRemaining ≤ 0`
-  4. **Killed / Trapped / Jailed** — only via a `desperate`-tagged choice resolving to failure
+- King Aldric is dying. You must reach his bedside before he does — or before Halric crowns a puppet.
+- You have **96 in-fiction hours**.
+- The world is alive: NPCs and factions act on their own plans whether or not you're watching. Your choices ripple — sometimes visibly, sometimes never seen.
+- You see only what you've witnessed or investigated. Curiosity is rewarded; ignorance has costs.
+- The game ends one of these ways:
+  1. **Reached the king** — bedside scene; ending shape determined by which threats completed, which you stopped, and which you never learned about
+  2. **Clock expired** — Halric crowns his puppet
+  3. **Killed / Trapped / Jailed** — only via a `desperate`-tagged choice resolving to failure
 
-### 1.2 Runtime state shape (new)
+### 1.2 Runtime state shape
 
 ```js
 {
   gameId, worldName,
-  turnNumber: int,                  // replaces beatNumber
+  turnNumber: int,
   lastAppliedLogTurn: int,
 
-  // Objective state (the new core)
-  distanceToKing: int (0..100),     // 100 at start
-  clockHours: int (0..96),          // 96 at start
-  movesRemaining: int (0..15),      // 15 at start
+  // Single visible clock (engine-owned)
+  clockHours: int (0..96),
+
+  // Engine-internal; gates the "reached-king" ending; never rendered
+  distanceToKing: int (0..100),
 
   // Player state
   condition: 'healthy' | 'tired' | 'wounded' | 'exhausted' | 'dying',
-  heat: int (0..4),                 // how hunted
-  location: string,                 // freeform
-  assets: string[],                 // 'horse', 'ally:sera', 'temple-shelter', etc.
-  knowledgeFacts: string[],
+  location: string,
+  assets: string[],                 // 'horse', 'ally:sera', 'temple-shelter', etc.; cap 12
 
-  // Mood accumulators (for ending shape)
-  selfOtherSum: float,              // sum across run; sign-of-average shapes ending
-  assertYieldSum: float,
-
-  // Last choice memo (for lethality gate)
+  // Last choice memo (lethality gate input)
   lastChoiceRisk: 'controlled' | 'risky' | 'desperate' | null,
 
-  // World coloring (kept for prose flavor)
-  worldState: { timeOfDay, cometStage },
+  // World simulation (always true, always ticked)
+  worldState: {
+    timeOfDay: string,
+    cometStage: string,
+    kingStatus: <enum>,
+    crownStatus: <enum>,
+    antagonistPower: <enum>,
+    majorEvents: string[]           // rolling, cap 12
+  },
 
-  terminalState: null | { kind, summary },
-  plotTrajectory: { majorEvents: string[], lastDirectorReasoning: string|null }
+  // Macro-threats (persistent, may surface as HUD meters when known)
+  threats: {
+    [threatId]: {
+      progress: int,                 // hours; engine-owned; ticks every turn
+      currentPhase: string,          // computed from progress against bundle phases
+      slowedBy: int,                 // accumulated player-induced slowdown
+      knownToPlayer: boolean,        // gates HUD render
+      revealedAtHour: int | null,
+      completed: boolean,
+      completedAt: int | null
+    }
+  },
+
+  // Scheduled events (one-shot pending world events)
+  scheduledEvents: [
+    {
+      id: string,
+      fireAtHour: int,               // absolute, in-fiction hours from start
+      preconditions: [...],
+      outcomeOnFire: { ... },
+      outcomeOnCancel: { ... } | null,
+      status: 'pending' | 'fired' | 'cancelled',
+      authorSource: 'authored' | 'model'
+    }
+  ],
+
+  // Player knowledge layer (curated subset surfaced through prose/hyperlinks)
+  playerKnowledge: {
+    knownThreatIds: string[],        // gates threat HUD rendering
+    witnessedEvents: [               // for prompt composer "what player saw"
+      { eventId, atHour, strength, summary }
+    ],
+    rumors: [                        // partial / unreliable
+      { fact, source, atHour, confidence }
+    ],
+    investigatedFacts: string[]      // unlocked via hyperlink clicks
+  },
+
+  // NPC state (knowledge-scoped; carried over from rev 1 architecture)
+  npcStates: { ... },
+
+  // Run accumulator (shapes ending; replaces hidden quadrant math)
+  runHistory: {
+    threatsCompleted: string[],
+    threatsStopped: string[],
+    threatsNeverLearned: string[],
+    counterfactualsFiredKnown: string[],
+    counterfactualsFiredSilent: string[]
+  },
+
+  terminalState: null | { kind, summary }
 }
 ```
 
-### 1.3 Model output contract (new)
+### 1.3 Model output contract
 
 ```js
 {
   worldImpacts: {
     stateChanges: {
-      distanceDelta: int,                  // [-20, +5]
-      clockHoursDelta: int,                // [-24, 0]
-      movesDelta: int,                     // -1 (or 0 on terminal)
+      clockHoursDelta: int,          // positive; server subtracts from clockHours
+      distanceDelta: int,            // engine-internal, no UI
       conditionChange: <enum> | null,
-      heatDelta: int,                      // [-1, +2]
       assetsAdded: string[],
       assetsRemoved: string[],
-      knowledgeAdded: string[],
-      worldStateDeltas: { timeOfDay?, cometStage? }
+      worldStateDeltas: { ... }
     },
-    majorEventLogged: string
+    majorEventLogged: string,
+
+    // Threat slowdowns from this turn's player action
+    threatSlowdowns: [
+      { threatId, hours, reason }
+    ],
+
+    // Model-authored scheduled events (engine-generated layer)
+    scheduledEventsToAdd: [
+      {
+        id: string,
+        fireAtHour: int,
+        preconditions: [...],
+        outcomeOnFire: {
+          worldStateDelta: {...},
+          npcImpacts: [...],
+          revelation: {
+            strength: 'loud' | 'quiet' | 'ambient' | 'silent',
+            delayHours: int,
+            content: string
+          }
+        },
+        outcomeOnCancel: { revelation: {...} | null } | null
+      }
+    ]
   },
 
-  npcImpacts: [...],                       // unchanged structure
+  npcImpacts: [...],                  // unchanged structure
 
   narrativeResponse: {
-    resolutionProse: string,               // narrates outcome of player's last choice
-    isEnding: boolean,
-    terminalState: null | { kind: <enum>, summary: string },
+    // Resolution prose for the just-resolved player choice
+    resolutionProse: {
+      segments: [
+        { type: 'text', content: string },
+        { type: 'link', id: string, content: string,
+          linkType: 'lore'|'clue'|'flavor'|'threat-reveal'|'npc-detail'|'investigation' }
+      ]
+    },
+    resolutionLinkContents: {
+      [linkId]: {
+        content: string,                // 20–50 words
+        costHours: int,                 // default 0
+        unlocksFacts: string[],
+        unlocksThreats: string[]        // threat ids that become knownToPlayer on click
+      }
+    },
 
-    nextBeat: null | {                     // null when terminal
-      title: string,                       // freeform; no roman numerals
-      intro: string,
-      choices: [                           // 2..4 choices (was forced 3)
+    isEnding: boolean,
+    terminalState: null | { kind: <enum>, summary },
+
+    nextBeat: null | {
+      title: string,
+      intro: { segments: [...] },
+      introLinkContents: { ... },
+      choices: [
         {
           label: 'A'|'B'|'C'|'D',
           text: string,
-          risk: 'controlled' | 'risky' | 'desperate',
-          stake: string,                   // 1-clause "what's at risk"
-          predictedDistanceDelta: int,
-          predictedClockHours: int,        // hours this option would cost (positive)
-          selfOther: float,                // 2x2 mood retained
-          assertYield: float
+          risk: 'controlled' | 'risky' | 'desperate'   // INTERNAL; not styled in UI
         }
-      ]
+      ]                                  // 2..4 entries
     }
   },
 
-  forwardProjection: { tonalAim, currentConfidence },  // simplified
+  forwardProjection: { tonalAim, currentConfidence },
   directorReasoning: string
 }
 ```
 
-### 1.4 Validator rules (delta from existing)
+### 1.4 Validator rules
 
-- `distanceDelta` clamped `[-20, +5]`
-- `clockHoursDelta` clamped `[-24, 0]`; cannot be positive
-- `movesDelta` must be `-1` or `0` (0 only when terminal)
-- `heatDelta` clamped `[-1, +2]`
-- `nextBeat.choices.length ∈ [2, 4]` (was strict 3)
-- Distinct-quadrant requirement **dropped** (was for 3 choices)
-- `assets.length` capped at 12 (oldest dropped on overflow)
-- **Lethality gate (critical):**
-  `terminalState.kind ∈ {killed, trapped, jailed}` is only legal when `state.lastChoiceRisk === 'desperate'`. Validator rejects otherwise.
-- `terminalState.kind === 'reached-king'` only legal when `distanceToKing ≤ 5` after deltas applied.
-- `terminalState.kind ∈ {time-up, moves-up}` only legal when respective counter hits 0 after deltas (server can also force these).
-- Server-owned fields (model cannot set directly): `distanceToKing`, `clockHours`, `movesRemaining`, `turnNumber`, `selfOtherSum`, `assertYieldSum`, `lastChoiceRisk`. Stripped silently if present.
+- `clockHoursDelta ∈ [0, 24]`; positive (server subtracts)
+- `distanceDelta ∈ [-20, +5]`
+- `nextBeat.choices.length ∈ [2, 4]`
+- `assets` length capped at 12 (oldest dropped on overflow)
+- **Lethality gate (terminal-only):**
+  - `terminalState.kind ∈ {killed, trapped, jailed}` is legal **only** when `state.lastChoiceRisk === 'desperate'`. Validator rejects otherwise.
+  - Non-lethal "surprise" consequences (heat-equivalent state changes, asset loss, NPC mood flips) are *legal* on `controlled` and `risky` choices. Safe ≠ predictable.
+  - `terminalState.kind === 'reached-king'` legal only when `distanceToKing ≤ 5` after deltas applied.
+  - `terminalState.kind === 'time-up'` legal only when `clockHours ≤ 0` after deltas (server may also force this).
+- **Server-owned (silently stripped if model sets):** `clockHours`, `distanceToKing`, `turnNumber`, every `threats[*].progress` / `knownToPlayer` / `completed` field, every `scheduledEvents[*].status`.
+- **Hyperlink rules:**
+  - Each `linkId` unique within a beat
+  - `linkType` ∈ {`lore`, `clue`, `flavor`, `threat-reveal`, `npc-detail`, `investigation`}
+  - `unlocksThreats` must reference threat ids defined in the world bundle
+  - `costHours ∈ [0, 6]`
+  - Beat is rejected if a link in `segments` has no matching entry in `linkContents`
+- **Scheduled event rules:**
+  - `fireAtHour > cumulativeHoursElapsed` (no past-scheduling)
+  - `revelation.strength` ∈ enum above
+  - `revelation.delayHours ∈ [0, 48]`
+- **Risk tag is internal.** Validator confirms its presence and enum membership but the UI layer is forbidden from styling it as a colored badge.
 
-### 1.5 Prompt composer — changes
+### 1.5 Prompt composer
 
-**Remove**:
+**Read from `playerKnowledge`, never from `worldState` directly.** The model literally cannot leak silent simulation because it never sees it. This extends the rev-1 NPC-knowledge-scoping principle to the world itself.
+
+**Remove:**
 - Pacing budget (`targetBeatCount`, `climaxByBeat`, `tokensPerBeat`)
-- Intensity curve (7-phase Aristotelian shape)
-- Any forced beat-sequence scaffolding
+- Aristotelian intensity curve / forced beat-sequence scaffolding
+- Predicted-delta authoring instruction
+- 2x2 quadrant authoring instruction
+- Stake-clause authoring instruction
+- Risk-badge UI rendering instruction
 
-**Keep**:
+**Keep:**
 - Voice, setting, tone
-- World bible (geography, magic rules, factions, recent history, current crisis, themes)
+- World bible (geography, magic, factions, history, current crisis, themes)
 - World constraints
 - Adaptation rules
-- Character roster — annotated with **"any of these may or may not appear; deploy them as the player's choices invite them in"**
-- Recent prose context window
+- Character roster — annotated "any of these may or may not appear; deploy them as the player's choices invite them in"
+- Recent prose context window (opening + last 3)
+- NPC knowledge scoping (in-scene full; off-screen no knowledge field)
 
-**Add**:
-- **Objective directive (top of prompt):** "The player must reach dying King Aldric. The game ends when they arrive, when the clock runs out, when their moves run out, or when they die/are trapped/jailed. Improvise from player state. Do not steer back to a script."
-- **Current state block:** distance / clockHours / movesRemaining / condition / heat / location / assets / recent facts
+**Add:**
+- **Objective directive (top of prompt):** "The player must reach dying King Aldric. The game ends when they arrive, when the clock runs out, or when they die/are trapped/jailed. Improvise from player state. Do not steer back to a script."
+- **Current state block (lean):** clockHours, condition, location, recent assets/facts, known threats with current phase
 - **Last turn:** chosen option text + its declared `risk` + the player's other (rejected) options
-- **Lethality budget:** "Use desperate-tier outcomes sparingly. Death/trap/jail require that the player chose a `desperate` option AND failed. If they chose `controlled` or `risky`, narrate consequence-with-cost, never termination."
-- **Ending trigger:** "If `distanceToKing ≤ 5` after applying your deltas, set `terminalState.kind = 'reached-king'` and write the bedside scene. The mood of that scene is shaped by the player's accumulated choices, not by your script."
+- **Lethality budget:** "Death/trap/jail require that the player chose `desperate` AND failed. On `controlled` or `risky`, you may surprise the player with non-lethal consequences (a stolen horse, a poisoned wound, an ally's trust shaken) — but never with termination."
+- **Living-world block:** lists due-revelations queued by the engine for this beat (loud/quiet/ambient) with instruction to weave them into prose at the marked strength.
+- **Hyperlink authoring instruction:** "Author 0–6 hyperlinks per beat. Tag each by linkType. Most should be `flavor` or `lore` (atmospheric, harmless). Use `clue` sparingly; reserve `threat-reveal` for when the player is brushing against a hidden threat. Costly investigations (hours > 0) should feel like deliberate effort, not casual reading."
+- **Counterfactual restraint:** "If you author scheduled events at runtime, default revelation strength is `quiet`, default delay is 12–24 hours. Reserve `loud` for events the player will likely encounter directly. Reserve `silent` for cancelled outcomes (the saved-without-knowing case)."
+- **Ending trigger:** "If `distanceToKing ≤ 5` after applying your deltas, set `terminalState.kind = 'reached-king'`. The mood of the bedside scene is shaped by `runHistory` (which threats you completed/stopped/never-learned), not by your script."
 
 ---
 
 ## 2. World Bundle Changes (`worlds/ember-crown/world.json`)
 
-**Remove**:
+**Remove:**
 - `pacingBudget`
 - `structuralObjective.climaxByBeat`
-- `openingBeat.choices` and the prescribed prose
+- `openingBeat.choices` with predicted deltas
 
-**Keep**:
+**Keep:**
 - `worldName`, `displayName`, `tagline`, `voice`, `settingAndTone`
 - `worldBible.*` (all)
 - `worldConstraints`, `adaptationRules`
-- `characters[]` (full roster)
+- `characters[]` (full roster, retaining `notes`/`baselineKnowledge`)
 - `playerStartingState`
 
-**Add**:
+**Add:**
+
 ```json
 "objective": {
   "primary": "Reach the dying King Aldric.",
-  "failModes": ["clock runs out", "moves run out", "killed", "trapped", "jailed"],
+  "failModes": ["clock runs out", "killed", "trapped", "jailed"],
   "successCondition": "Stand at his bedside before he dies."
 },
+
 "startingClocks": {
-  "distanceToKing": 100,
   "clockHours": 96,
-  "movesRemaining": 15
+  "distanceToKing": 100
 },
+
+"threats": [
+  {
+    "id": "halric-coronation",
+    "displayName": "Halric's Plan",
+    "icon": "crown-broken",
+    "duration": 96,
+    "phases": [
+      { "atProgress": 0,  "label": "Brewing" },
+      { "atProgress": 40, "label": "Moving" },
+      { "atProgress": 75, "label": "Imminent" }
+    ],
+    "unlockConditions": [
+      { "type": "playerKnowsFact", "fact": "halric-plotting-coronation" }
+    ],
+    "interactions": [
+      { "trigger": "messenger-intercepted", "effect": "slow", "amount": 12 }
+    ],
+    "onComplete": {
+      "worldStateDelta": { "antagonistPower": "king" },
+      "majorEvent": "Halric crowned his puppet."
+    }
+  }
+],
+
+"authoredScheduledEvents": [
+  {
+    "id": "kings-decline-hour-48",
+    "fireAtHour": 48,
+    "preconditions": [],
+    "outcomeOnFire": {
+      "worldStateDelta": { "kingStatus": "near-death" },
+      "revelation": {
+        "strength": "loud",
+        "delayHours": 0,
+        "content": "Bells toll in distant towers."
+      }
+    },
+    "outcomeOnCancel": null
+  }
+],
+
 "openingScene": {
   "location": "Wren's Hollow, dawn",
-  "prose": "<existing opening prose, kept>",
+  "prose": { "segments": [ /* structured with hyperlinks */ ] },
+  "linkContents": { /* matching link ids */ },
   "choices": [
-    {"label":"A","text":"Open the door before she can knock.","risk":"controlled","stake":"Commit to whatever she came to say.","predictedDistanceDelta":-2,"predictedClockHours":1,"selfOther":0.4,"assertYield":0.4},
-    {"label":"B","text":"Stay silent. Do not answer.","risk":"risky","stake":"She may search the village or ride on without you.","predictedDistanceDelta":0,"predictedClockHours":2,"selfOther":-0.4,"assertYield":0.5},
-    {"label":"C","text":"Slip out the back, into the woods.","risk":"risky","stake":"You go alone, blind to what she knew.","predictedDistanceDelta":-1,"predictedClockHours":3,"selfOther":-0.6,"assertYield":-0.4}
+    { "label": "A", "text": "Open the door before she can knock.",   "risk": "controlled" },
+    { "label": "B", "text": "Stay silent. Do not answer.",           "risk": "risky" },
+    { "label": "C", "text": "Slip out the back, into the woods.",    "risk": "risky" }
   ]
 }
 ```
 
-`xlsx-to-bundle.mjs` updates: drop `pacingBudget`/`openingBeat` mappings; add `objective`/`startingClocks`/`openingScene` mappings.
+`xlsx-to-bundle.mjs` updates:
+- Drop `pacingBudget` / `openingBeat` mappings
+- Add `objective` / `startingClocks` / `threats[]` / `authoredScheduledEvents[]` / `openingScene` mappings
+- New xlsx sheets: `Threats`, `ScheduledEvents`, `OpeningScene` (with link rows)
+
+Tentpole event count for Ember Crown v1: **5–8 authored scheduled events** (king's decline thresholds, Halric phase-shifts, comet zenith, etc.) plus the macro-threat. Final count is open question §7.
 
 ---
 
 ## 3. Server Flow Changes (`server/server.js`)
 
 ### 3.1 Turn-1 (opening)
-- Seed runtime state from `world.startingClocks` and `world.playerStartingState`
-- Render `openingScene` directly (no model call); emit `final`
+- Seed runtime state from `world.startingClocks`, `world.playerStartingState`, `world.threats`, `world.authoredScheduledEvents`.
+- All threats start `progress: 0, knownToPlayer: false`.
+- Render `openingScene` directly (no model call); seed log with synthetic turn-1 entry.
 
 ### 3.2 Turn-2+ (every subsequent turn)
-1. **Apply previous choice's deltas to state.** Authoritative server-side mutation:
-   - Decrement `clockHours` by the chosen option's `predictedClockHours` (final, model can't override)
-   - Decrement `movesRemaining` by 1
-   - Apply `distanceDelta`, `heatDelta`, `condition` from `worldImpacts.stateChanges`
-   - Append `assetsAdded` minus `assetsRemoved`
-   - Update `selfOtherSum`, `assertYieldSum` from chosen option's coords
-   - Set `lastChoiceRisk`
-2. **Check forced terminals before model call:**
+
+1. **Apply previous choice's deltas authoritatively.**
+   - `clockHours -= clockHoursDelta`
+   - `distanceToKing += distanceDelta` (clamped)
+   - Apply `condition`, `assetsAdded`/`assetsRemoved`, `worldStateDeltas`
+   - Set `lastChoiceRisk` from the chosen option
+
+2. **World tick (engine-owned, runs regardless of player visibility):**
+   - For each `threats[*]`: `progress += clockHoursDelta - applicableSlowdown`. Recompute `currentPhase`. If `progress ≥ duration`, mark completed and queue its `onComplete` payload.
+   - For each `scheduledEvents[*]` with `status === 'pending'` and `fireAtHour ≤ cumulativeHoursElapsed`:
+     - Evaluate preconditions
+     - Mark `fired` or `cancelled`
+     - Apply `outcomeOnFire.worldStateDelta` / `npcImpacts` (or `outcomeOnCancel`)
+     - Enqueue the event's `revelation` into the revelation queue (with delay)
+   - Process due revelations: any with `revealAtHour ≤ cumulativeHoursElapsed` are moved into `playerKnowledge.witnessedEvents` and flagged for the prompt composer to weave into next prose.
+
+3. **Check forced terminals before model call:**
    - `clockHours ≤ 0` → emit `time-up` ending; skip model
-   - `movesRemaining ≤ 0` → emit `moves-up` ending; skip model
-3. **Compose prompt** from new state.
-4. **Stream model** (existing SSE path).
-5. **Validate.** On fail → 1 retry with `resume: sessionId` (existing).
-6. **Apply model deltas** to a copy of state; check terminal predicates:
-   - `distanceToKing ≤ 5` AND `terminalState.kind === 'reached-king'` → ending
-   - `terminalState.kind ∈ {killed,trapped,jailed}` AND lastChoiceRisk was `desperate` → terminal
-   - Otherwise non-terminal continuation
-7. **Persist + emit `final`.**
+   - Any threat with `id === 'halric-coronation'` completed → emit `time-up`-flavored ending (Halric crowned)
+
+4. **Compose prompt** from `playerKnowledge` and lean state block (see §1.5). Include due-revelations.
+
+5. **Stream model** (existing SSE path).
+
+6. **Validate.** On fail → 1 retry with `resume: sessionId`.
+
+7. **Apply model deltas** to a copy of state. Write-ahead log entry.
+
+8. **Process model-authored `scheduledEventsToAdd`:** validate, add to `scheduledEvents[]` with `authorSource: 'model'`.
+
+9. **Process `threatSlowdowns`:** apply to corresponding threats' `slowedBy`.
+
+10. **Check terminal predicates after model deltas:**
+    - `distanceToKing ≤ 5` AND `terminalState.kind === 'reached-king'` → ending
+    - `terminalState.kind ∈ {killed, trapped, jailed}` AND `lastChoiceRisk === 'desperate'` → terminal
+    - Otherwise continue
+
+11. **Persist + emit `final`.**
 
 ### 3.3 New / changed endpoints
+
 - `POST /turn/stream` — unchanged signature; new internals
-- `GET /state?gameId=` — returns public state for browser refresh
+- `POST /investigate` — body `{ gameId, beatNumber, linkId }`. Server looks up the beat's `linkContents[linkId]`, applies `costHours` (subtracts from `clockHours`, runs world tick on the consumed hours), applies `unlocksFacts` to `playerKnowledge.investigatedFacts`, applies `unlocksThreats` to `playerKnowledge.knownThreatIds`. Returns the link's `content` plus updated state slice. Idempotent per linkId per beat (a given link can only be opened once per beat).
+- `GET /state?gameId=` — returns public state for browser refresh; filtered through `playerKnowledge`
 - `POST /reset` — unchanged
 
 ---
 
 ## 4. Browser UI Changes (`index.html`)
 
-### 4.1 Side panel widgets (new)
-- **Clock face**: hours remaining, color-shifts red below 24
-- **Moves counter**: "12 / 15 moves"
-- **Distance bar**: "47 leagues to Vael's Reach"
-- **Heat meter**: 0–4 pip indicator
-- **Condition badge**: text chip with status color
-- **Assets chip list**: comma-separated, including `ally:sera` style relationships
+### 4.1 Side panel — minimal HUD
+- **Clock face:** hours remaining; color shifts amber below 36h, red below 12h. No exact number under 12h — switches to qualitative ("a handful of hours left").
+- **Condition badge:** text chip with status color
+- **Threat meters (0–2 visible):** only render where `playerKnowledge.knownThreatIds` includes the threat. Display: icon + displayName + qualitative phase label ("Brewing" / "Moving" / "Imminent"). **No numbers, no fill bar percentage.** Optional fill style is purely visual gradient. If more than 2 threats are known, show the 2 most progressed; the rest collapse into a "..." chip with hover-detail.
 
-### 4.2 Choice rendering (changed)
+Removed widgets (live in prose only): distance, heat, moves, assets list.
+
+### 4.2 Prose rendering
+- Render `segments[]` inline. `text` segments are plain. `link` segments use **subtle dotted underline + soft accent color** (not button-styled).
+- Click opens a small popup or right-rail slide-in showing `linkContents[linkId].content`.
+- If `costHours > 0`, popup shows a confirmation gate: "Investigate? (costs ~Nh)" before consuming the time.
+- Once a link is opened, its style shifts to "read" state (still legible, less prominent).
+- Hyperlinks survive across re-renders within the same beat; cleared at next beat.
+
+### 4.3 Choice rendering (changed)
 - 2–4 buttons (not always 3)
-- **Risk badge** per choice: green (controlled) / amber (risky) / red (desperate)
-- **Stake clause** under choice text in italics
-- **Cost preview**: "−8 leagues · −12h · 1 move"
-- 2x2 quadrant tag retained but de-emphasized (small)
+- **No risk badge.** No stake clause. No cost preview. Buttons display only `text`.
+- The model is responsible for conveying weight through prose tone alone.
 
-### 4.3 Terminal screens
-- `reached-king` — bedside scene; ending-shape branch chosen by `selfOtherSum`/`assertYieldSum` averages
-- `time-up` — "Halric crowns his puppet. The era ends without you."
-- `moves-up` — "You are still on the road when the bells toll for the king."
-- `killed`/`trapped`/`jailed` — cutscene + "Begin Again"
+### 4.4 Terminal screens
+- **`reached-king`** — bedside scene. Ending shape selected by `runHistory`: which threats completed (loud failures), which the player stopped (quiet wins), which they never learned existed (ambient irony). Model authors the scene; engine passes the runHistory summary as input.
+- **`time-up`** — Halric crowns his puppet. The era ends without you.
+- **`killed` / `trapped` / `jailed`** — cutscene + "Begin Again."
 
 ---
 
@@ -244,58 +447,72 @@
 
 ### Existing test files — extend
 - `test-validator.mjs`:
-  - desperate-only lethality rule (positive + negative cases)
-  - distance/clock/moves/heat clamp ranges
+  - desperate-only terminal lethality (positive + negative cases)
+  - non-lethal surprises legal on controlled/risky
+  - clockHours/distance/heat clamps
   - 2..4 choice count
-  - server-owned fields stripped
+  - server-owned fields stripped (including threat & scheduledEvent server-owned fields)
+  - hyperlink schema (unique ids, linkType enum, costHours range, unlocksThreats refs)
 - `test-phase4.mjs`: update fixtures to new schema; remove pacing-budget assertions
 
 ### New test files
-- `test-state-engine.mjs`:
-  - apply delta with clamps
-  - terminal detection (5 cases)
-  - lethality gate enforcement
-- `test-prompt-composer.mjs` (extend if exists, else new):
-  - beat sequence section absent
-  - objective + state block present
-  - lethality budget instruction present
+- `test-state-engine.mjs`: delta application with clamps; terminal detection (4 cases)
+- `test-threat-engine.mjs`: tick, phase-shift, slowdown, completion, onComplete payload application
+- `test-scheduled-events.mjs`:
+  - precondition evaluation (cancel vs. fire)
+  - revelation queueing with delay
+  - revelation strength routing
+  - model-authored event ingestion
+- `test-knowledge-layer.mjs`: prompt composer reads only from `playerKnowledge`; silent-sim never appears in prompt
+- `test-hyperlink-flow.mjs`: `/investigate` endpoint applies costHours, unlocksFacts, unlocksThreats; idempotent per linkId per beat; threat unlock makes threat visible
+- `test-prompt-composer.mjs` (extend or new): no pacing-budget block; objective + lean state block present; due-revelations injected; lethality budget present; hyperlink instruction present
 
 ---
 
 ## 6. Phased Rollout
 
-| Phase | Deliverable                                                                           | Test gate                                          |
-|-------|---------------------------------------------------------------------------------------|----------------------------------------------------|
-| **A** | Schema spec files (`server/schemas/objective.{model-output,runtime-state}.json`)       | User signs off on contract                         |
-| **B** | Validator updates per §1.4                                                            | `test-validator.mjs` green                         |
-| **C** | World bundle migrated; `xlsx-to-bundle.mjs` updated                                   | Bundle loads + revalidates                         |
-| **D** | Prompt composer rewrite per §1.5                                                       | Snapshot test of rendered prompt                   |
-| **E** | State engine + delta applier + terminal detection                                     | `test-state-engine.mjs` green                      |
-| **F** | Server `/turn/stream` rewired; `/state` added                                         | Manual smoke run reaches a terminal each path      |
-| **G** | Browser UI per §4                                                                     | Visual playtest of all terminal screens            |
-| **H** | Playtest pass — 5 runs covering each terminal; tune clamps & starting clocks         | Subjective: does it feel tense?                    |
+| Phase | Deliverable                                                                             | Test gate                                                  |
+|-------|------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| **A** | Schema spec files (`server/schemas/objective.{model-output,runtime-state}.json`)         | User signs off on contract                                 |
+| **B** | Validator updates per §1.4                                                               | `test-validator.mjs` green                                 |
+| **C** | World bundle migration; `xlsx-to-bundle.mjs` updated; tentpole events authored           | Bundle loads + revalidates                                 |
+| **D** | Threat engine (tick, phase, slowdown, completion)                                        | `test-threat-engine.mjs` green                             |
+| **E** | Scheduled-events engine (precondition, fire/cancel, revelation queue)                    | `test-scheduled-events.mjs` green                          |
+| **F** | Knowledge layer + revelation routing into prompt                                         | `test-knowledge-layer.mjs` green                           |
+| **G** | Prompt composer rewrite per §1.5                                                          | Snapshot test of rendered prompt                           |
+| **H** | Hyperlink rendering + `/investigate` endpoint                                            | `test-hyperlink-flow.mjs` green                            |
+| **I** | Server `/turn/stream` rewired; `/state` filtered through playerKnowledge                 | Manual smoke run reaches each terminal                     |
+| **J** | Browser UI per §4 (minimal HUD + hyperlink prose + terminals)                            | Visual playtest of all terminal screens + hyperlink flow   |
+| **K** | Playtest pass — 5 runs covering each terminal; tune clamps, tentpole timing, link density | Subjective: does the world feel alive?                     |
 
 ---
 
 ## 7. Open Questions for User Review
 
-1. **Both budgets, or one?** Current plan tracks `clockHours` AND `movesRemaining` (hours = fictional pacing, moves = decision-budget abstraction). Alternative: pick one. *My recommendation: both — they reinforce each other.*
-2. **Heat granularity.** Plan uses 0–4. Want finer (0–10)? *My recommendation: 0–4 is sufficient for v1.*
-3. **Assets include relationships?** `ally:sera`, `enemy:halric` style. *My recommendation: yes — relationships are first-class assets.*
-4. **Ending shapes at the king's bedside.** Plan: 3–4 endings shaped by `selfOtherSum`/`assertYieldSum` quadrant. Alternative: single arrival scene, model improvises ending. *My recommendation: 3-4 templated end-shapes that AI fills in, prevents flat endings.*
-5. **Re-prompt budget on validation fail.** Currently 1 retry. Keep? *My recommendation: keep at 1.*
-6. **Choice-count distribution.** AI picks 2–4 — should we enforce a minimum-3 default? *My recommendation: let AI choose 2–4 freely; trust the model to use 2 only when context demands it.*
+1. **Tentpole authored events for Ember Crown v1.** Plan currently calls for 5–8. Need a list. *Recommendation: king's decline at 24h/48h/72h; Halric phase-shifts at 40h/75h; comet zenith at 60h. ~6 total.*
+2. **Default revelation strength for cancelled counterfactuals.** Strong tone-shaping decision. *Recommendation: 70% `quiet` (delayed indirect evidence), 30% `silent` (player never learns). Most ripples surface; some are kindnesses the world keeps.*
+3. **Hyperlink budget per beat.** 0–6 links per beat at 20–50 words each = up to ~300 extra output tokens per beat. Acceptable? *Recommendation: yes, cap at 6 per beat in validator; flag for cost review at Phase K.*
+4. **Player investigation as explicit verb.** "Ask Sera about Halric" — is this a hyperlink on her name with `costHours > 0`, or a separate mechanism? *Recommendation: the hyperlink path. Keeps one mechanism for all player-driven curiosity.*
+5. **Macro-threat authorship — model or world bundle only?** Can the model promote a runtime situation into a new persistent threat with a meter? *Recommendation: v1 = bundle-only. Model can schedule short-horizon events freely; promotion to macro-threat is authoring-only. Revisit in v2.*
+6. **Investigation time-cost balance.** What share of the 96-hour budget should a curious player spend on hyperlink investigation? *Recommendation: aim for ~10% (≈10h) in playtest; tune at Phase K.*
+7. **Collapsed-threat HUD overflow.** When >2 threats are known, should the overflow chip show count only, or summary? *Recommendation: count + hover-detail; do not enlarge the visible HUD.*
+8. **Ending shapes from `runHistory`.** How many distinct bedside-scene templates? *Recommendation: 4 — clean victory (most threats stopped); costly victory (king lives but world is changed); pyrrhic (king lives, ally lost or world fractured); ambient irony (you saved things you never knew were threatened).*
+9. **Re-prompt budget on validation fail.** Keep at 1? *Recommendation: yes.*
+10. **Choice count distribution.** Free 2–4, or default 3 with model permitted to drop to 2 in tight scenes? *Recommendation: free 2–4; trust the model.*
 
 ---
 
 ## 8. Out of Scope (v2+)
 
-- Ad-hoc waypoint clocks (Halric outriders closing in, Temple shelter timer)
-- Location nodes / map navigation
+- Player-authored macro-threats (model can schedule short events; cannot promote to threat)
+- Map / location-graph navigation
 - Skill stats / dream-charge meta-resource
-- Inventory verbs as conditional 4th choices
+- Inventory verbs as conditional choices
 - Multiple worlds with different objective archetypes
 - Persistent run history / cross-run unlocks
+- Social mechanics / negotiation sub-systems
+- Adaptive hyperlink density (more links for active investigators, fewer for skimmers)
+- Misinformation layer (NPCs lying; rumors that contradict world truth)
 
 ---
 
@@ -303,24 +520,29 @@
 
 | Risk                                                     | Mitigation                                                              |
 |----------------------------------------------------------|-------------------------------------------------------------------------|
-| AI uses `desperate` outcomes too eagerly                 | Lethality budget instruction; tune via playtest H                       |
-| AI declares unrealistic `predictedDistanceDelta`         | Server clamps to validator range; player sees real cost post-resolution |
-| Open structure → bland generic medieval                  | Keep full world bible + character roster in every prompt                |
+| Model uses `desperate` outcomes too eagerly              | Lethality-budget instruction; tune via Phase K                          |
+| Open structure → bland generic medieval                  | Keep full world bible + character roster + tentpole events in every prompt |
 | Player feels arbitrary deaths                            | Lethality gate: only desperate-tier choices can terminate the run       |
-| Clock vs moves feels redundant                           | Phase H tuning; can collapse to one if playtest shows it                |
-| 15 moves too few / too many                              | Phase H tuning; world bundle controls starting values                   |
-| Rounding errors in `selfOtherSum` shape ending poorly    | Sign-of-average is robust; quadrant assignment is coarse on purpose     |
+| HUD bloat creeps back as features are added              | Hard cap: clock + condition + 2 visible threat meters. Validate UI in PR review |
+| Model leaks silent-sim through prose                     | Engine never feeds `worldState` to prompt; only `playerKnowledge`       |
+| Hyperlink budget balloons output tokens                  | Validator caps links/beat; per-link content ≤ 50 words; cost monitored in log |
+| Counterfactuals fire silently and player never feels weight | Default revelation `quiet`+delayed; only ~30% truly silent. Phase K subjective check |
+| Player misses the "earned HUD" mechanic and never investigates | Tentpole events surface loudly enough to teach the convention in run 1; world bible mentions investigation in opening prose |
+| Tentpole authoring is tedious                            | Limit to 5–8 per world; provide xlsx sheets with consistent shape       |
+| Threat slowdown encourages spam-disrupt play             | Slowdowns require `desperate` choices and have authored caps per threat |
+| Investigation cost balance feels punishing or trivial    | Phase K tuning; world bundle controls per-link `costHours` defaults     |
 
 ---
 
 ## 10. Approval Checklist
 
-- [ ] §1.2 runtime state shape acceptable
-- [ ] §1.3 model output contract acceptable
-- [ ] §1.4 validator rules acceptable (esp. lethality gate)
-- [ ] §1.5 prompt composer changes acceptable
-- [ ] §2 world bundle migration acceptable
-- [ ] §3 server flow acceptable
-- [ ] §4 browser UI acceptable
+- [ ] §1.1 player-facing premise acceptable (drop `moves-up` ending; minimal HUD)
+- [ ] §1.2 runtime state shape acceptable (worldState vs playerKnowledge separation; threats/scheduledEvents shapes)
+- [ ] §1.3 model output contract acceptable (structured prose, link contents, scheduled events, threat slowdowns)
+- [ ] §1.4 validator rules acceptable (lethality gate scope; hyperlink schema; server-owned strip)
+- [ ] §1.5 prompt composer acceptable (knowledge-layer read; revelation injection; hyperlink + counterfactual instructions)
+- [ ] §2 world bundle migration acceptable (threats, authoredScheduledEvents, openingScene with hyperlinks)
+- [ ] §3 server flow acceptable (world tick; revelation queue; `/investigate` endpoint)
+- [ ] §4 browser UI acceptable (minimal HUD; subtle hyperlinks; no risk badges/stake/cost)
 - [ ] §6 phased rollout order acceptable
 - [ ] §7 open questions answered
