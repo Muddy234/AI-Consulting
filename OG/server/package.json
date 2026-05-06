@@ -1,0 +1,15 @@
+{
+  "name": "ember-crown-server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
+    "adm-zip": "^0.5.17",
+    "cors": "^2.8.5",
+    "express": "^4.21.0"
+  }
+}
