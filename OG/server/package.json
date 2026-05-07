@@ -7,7 +7,8 @@
     "start": "node server.js",
     "build:bundle": "node lib/yaml-to-bundle.mjs --world=ember-crown",
     "test:objective-validator": "node tools/test-objective-validator.mjs",
-    "test:yaml-to-bundle": "node tools/test-yaml-to-bundle.mjs"
+    "test:yaml-to-bundle": "node tools/test-yaml-to-bundle.mjs",
+    "test:threat-engine": "node tools/test-threat-engine.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",
