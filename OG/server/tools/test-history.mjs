@@ -5,9 +5,6 @@
 // back through buildRecentHistory. Verifies opening-always-included,
 // dedup, chronological order, and segment stitching.
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { LOGS_DIR } from '../lib/config.mjs';
 import {
   appendTurnEntry,
   appendAppliedMarker,

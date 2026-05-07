@@ -1,4 +1,4 @@
-// Objective prompt composer (Phase G). See OBJECTIVE_REFACTOR_PLAN.md §1.5.
+// Objective prompt composer. See OBJECTIVE_REFACTOR_PLAN.md §1.5.
 //
 // Splits the prompt into:
 //   - system: stable per-game instructions (voice, world bible, rules,
@@ -10,8 +10,7 @@
 //     facts, rumors, recent history prose, last turn's chosen option +
 //     alternatives, "generate the next beat" cap)
 //
-// Reads from the knowledge-layer view, never from raw state. Lives next
-// to the rev-1 prompt-composer.mjs until Phase I retires the latter.
+// Reads from the knowledge-layer view, never from raw state.
 
 import { buildKnowledgeView } from './knowledge-layer.mjs';
 

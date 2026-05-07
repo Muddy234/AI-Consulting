@@ -10,18 +10,13 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
-import {
-  convertYamlToBundle,
-  yamlPath,
-  jsonPath
-} from '../lib/yaml-to-bundle.mjs';
+import { convertYamlToBundle, jsonPath } from '../lib/yaml-to-bundle.mjs';
 import { loadWorldBundle } from '../lib/world-bundle.mjs';
 import {
   validateWorldBundle,
   formatErrors
 } from '../lib/objective-validator.mjs';
-import { DEFAULT_WORLD, WORLDS_DIR } from '../lib/config.mjs';
+import { DEFAULT_WORLD } from '../lib/config.mjs';
 
 let pass = 0, fail = 0;
 function ok(label, cond, detail) {

@@ -96,7 +96,7 @@
 
     "npcStates": {
       "type": "object",
-      "description": "NPC live state keyed by npcId. Knowledge-scoping mechanism from rev-1 architecture.",
+      "description": "NPC live state keyed by npcId. Each NPC carries currentKnowledge entries scoped per the knowledge-isolation rule (see prompt composer).",
       "additionalProperties": { "$ref": "#/$defs/npcRuntimeState" }
     },
 
@@ -319,7 +319,7 @@
 
     "runHistory": {
       "type": "object",
-      "description": "Run-end accumulator. Replaces hidden quadrant math from rev-1. Drives the ending-shape selection.",
+      "description": "Run-end accumulator. Drives ending-shape selection (which threats completed, which the player stopped, which they never learned existed, which counterfactuals fired).",
       "additionalProperties": false,
       "required": ["threatsCompleted", "threatsStopped", "threatsNeverLearned", "counterfactualsFiredKnown", "counterfactualsFiredSilent"],
       "properties": {
