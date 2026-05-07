@@ -49,6 +49,13 @@ function makeBundle() {
   return {
     worldName: 'ember-crown',
     startingClocks: { clockHours: 96, distanceToKing: 100 },
+    worldStateEnums: {
+      timeOfDay:       ['dawn', 'midday', 'dusk', 'night'],
+      cometStage:      ['approaching', 'near-zenith', 'zenith', 'passing', 'passed'],
+      kingStatus:      ['declining', 'dying', 'near-death', 'dead'],
+      crownStatus:     ['dormant', 'held', 'activated', 'destroyed'],
+      antagonistPower: ['advisor', 'regent', 'crowned', 'king', 'dead']
+    },
     characters: [
       { id: 'sera',   name: 'Sera' },
       { id: 'halric', name: 'Halric' }

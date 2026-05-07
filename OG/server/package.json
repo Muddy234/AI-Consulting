@@ -5,12 +5,15 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test:objective-validator": "node tools/test-objective-validator.mjs"
+    "build:bundle": "node lib/yaml-to-bundle.mjs --world=ember-crown",
+    "test:objective-validator": "node tools/test-objective-validator.mjs",
+    "test:yaml-to-bundle": "node tools/test-yaml-to-bundle.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",
     "ajv": "^8.20.0",
     "cors": "^2.8.5",
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "js-yaml": "^4.1.1"
   }
 }

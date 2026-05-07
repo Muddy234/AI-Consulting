@@ -1,10 +1,12 @@
-// Loads + validates + caches world.json bundles.
-// Server calls loadWorldBundle once at startup; per-turn code calls getCachedBundle.
+// Loads + validates + caches world bundles.
+// world.yaml (committed) is the source of truth; world.json (gitignored)
+// is the runtime artifact, regenerated from YAML at boot via lib/yaml-to-bundle.mjs.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { WORLDS_DIR } from './config.mjs';
-import { validateWorldBundle, formatErrors } from './validator.mjs';
+import { convertYamlToBundle } from './yaml-to-bundle.mjs';
+import { validateWorldBundle, formatErrors } from './objective-validator.mjs';
 
 const cache = new Map();  // worldName -> bundle
 
@@ -13,10 +15,13 @@ export function bundlePath(worldName) {
 }
 
 /**
- * Reads, validates, and caches the world bundle.
- * Throws a verbose error if the bundle is missing or invalid.
+ * Regenerates world.json from world.yaml if needed (mtime-aware), reads,
+ * validates, and caches the bundle. Throws a verbose error on any failure.
  */
 export function loadWorldBundle(worldName) {
+  // Regenerate JSON from YAML if YAML is newer (or if JSON is missing).
+  convertYamlToBundle({ worldName, silent: true });
+
   const p = bundlePath(worldName);
   if (!fs.existsSync(p)) {
     throw new Error(`World bundle not found: ${p}.`);

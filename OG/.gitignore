@@ -2,3 +2,5 @@ node_modules/
 state/
 logs/
 *.tmp
+# world.json is generated at server boot from world.yaml (see lib/yaml-to-bundle.mjs)
+worlds/*/world.json

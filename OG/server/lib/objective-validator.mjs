@@ -20,15 +20,9 @@ import path from 'node:path';
 import url from 'node:url';
 import Ajv from 'ajv';
 
-// ----- per-world enums (TODO: Phase C moves these to the world bundle) -----
-
-const WORLD_STATE_ENUMS = {
-  timeOfDay:       ['dawn', 'midday', 'dusk', 'night'],
-  cometStage:      ['approaching', 'near-zenith', 'zenith', 'passing', 'passed'],
-  kingStatus:      ['declining', 'dying', 'near-death', 'dead'],
-  crownStatus:     ['dormant', 'held', 'activated', 'destroyed'],
-  antagonistPower: ['advisor', 'regent', 'crowned', 'king', 'dead']
-};
+// Per-world enums (kingStatus / cometStage / etc.) live on the world bundle
+// at `bundle.worldStateEnums` from Phase C onward. This validator reads them
+// from there; the Ember Crown values are authored in worlds/ember-crown/world.yaml.
 
 // Server-owned fields the model must not set inside a worldStateDeltas block.
 // (Top-level runtime-state fields — model could try to sneak them into the open
@@ -237,10 +231,11 @@ function checkMacroThreatRules(output, state, errors) {
   }
 }
 
-function checkWorldStateEnums(output, errors) {
+function checkWorldStateEnums(output, bundle, errors) {
+  const enums = bundle?.worldStateEnums;
   const wsd = output?.worldImpacts?.stateChanges?.worldStateDeltas;
-  if (!wsd) return;
-  for (const [key, allowed] of Object.entries(WORLD_STATE_ENUMS)) {
+  if (!enums || !wsd) return;
+  for (const [key, allowed] of Object.entries(enums)) {
     if (key in wsd && !allowed.includes(wsd[key])) {
       errors.push({
         path: `worldImpacts.stateChanges.worldStateDeltas.${key}`,
@@ -296,6 +291,158 @@ function checkUnlockThreatRefs(output, state, bundle, errors) {
   );
 }
 
+// ----- world bundle validation (Phase C) -----
+
+// Required top-level fields on a world bundle (rev-2 schema).
+const BUNDLE_REQUIRED_TOP = [
+  'worldName', 'displayName', 'voice', 'worldBible',
+  'worldConstraints', 'adaptationRules', 'worldStateEnums',
+  'objective', 'startingClocks', 'startingWorldState',
+  'threats', 'authoredScheduledEvents',
+  'characters', 'playerStartingState', 'openingScene'
+];
+
+const BUNDLE_OBJECTIVE_REQUIRED = ['primary', 'failModes', 'successCondition'];
+const BUNDLE_STARTING_CLOCKS_REQUIRED = ['clockHours', 'distanceToKing'];
+const BUNDLE_OPENING_SCENE_REQUIRED = ['location', 'prose', 'linkContents', 'choices'];
+const BUNDLE_PLAYER_REQUIRED = ['location', 'condition', 'assets'];
+
+const VALID_LINK_TYPES = new Set(['lore', 'clue', 'flavor', 'threat-reveal', 'npc-detail', 'investigation']);
+const VALID_RISKS = new Set(['controlled', 'risky', 'desperate']);
+
+function checkRequiredTop(obj, requiredKeys, basePath, errors) {
+  for (const k of requiredKeys) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) {
+      errors.push({
+        path: basePath ? `${basePath}.${k}` : k,
+        message: 'missing required field'
+      });
+    }
+  }
+}
+
+function checkOpeningSceneShape(scene, errors) {
+  if (!scene || typeof scene !== 'object') return;
+  checkRequiredTop(scene, BUNDLE_OPENING_SCENE_REQUIRED, 'openingScene', errors);
+
+  // prose.segments + linkContents correspondence (mirrors model-output check)
+  checkLinkCorrespondence(
+    scene.prose,
+    scene.linkContents,
+    'openingScene.prose',
+    'openingScene.linkContents',
+    errors
+  );
+  // segment linkType enum
+  const segments = scene?.prose?.segments || [];
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+    if (s?.type === 'link' && s.linkType && !VALID_LINK_TYPES.has(s.linkType)) {
+      errors.push({
+        path: `openingScene.prose.segments[${i}].linkType`,
+        message: `invalid linkType '${s.linkType}' (allowed: ${[...VALID_LINK_TYPES].join(', ')})`
+      });
+    }
+  }
+  // choice cardinality + risk enum
+  const choices = scene?.choices || [];
+  if (choices.length < 2 || choices.length > 4) {
+    errors.push({
+      path: 'openingScene.choices',
+      message: `must have 2..4 choices, got ${choices.length}`
+    });
+  }
+  for (let i = 0; i < choices.length; i++) {
+    const c = choices[i];
+    if (c?.risk && !VALID_RISKS.has(c.risk)) {
+      errors.push({
+        path: `openingScene.choices[${i}].risk`,
+        message: `invalid risk '${c.risk}' (allowed: ${[...VALID_RISKS].join(', ')})`
+      });
+    }
+  }
+}
+
+function checkThreatsShape(threats, errors) {
+  if (!Array.isArray(threats)) return;
+  const seen = new Set();
+  for (let i = 0; i < threats.length; i++) {
+    const t = threats[i];
+    if (!t.id) {
+      errors.push({ path: `threats[${i}].id`, message: 'missing required field' });
+      continue;
+    }
+    if (seen.has(t.id)) {
+      errors.push({ path: `threats[${i}].id`, message: `duplicate threat id '${t.id}'` });
+    }
+    seen.add(t.id);
+    if (typeof t.duration !== 'number' || t.duration < 1) {
+      errors.push({ path: `threats[${i}].duration`, message: `must be positive integer; got ${t.duration}` });
+    }
+    if (!Array.isArray(t.phases) || t.phases.length === 0) {
+      errors.push({ path: `threats[${i}].phases`, message: 'must be non-empty array' });
+    }
+    if (!t.onComplete?.majorEvent) {
+      errors.push({ path: `threats[${i}].onComplete.majorEvent`, message: 'missing required field' });
+    }
+  }
+}
+
+function checkScheduledEventsShape(events, errors) {
+  if (!Array.isArray(events)) return;
+  const seen = new Set();
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if (!e.id) {
+      errors.push({ path: `authoredScheduledEvents[${i}].id`, message: 'missing required field' });
+      continue;
+    }
+    if (seen.has(e.id)) {
+      errors.push({ path: `authoredScheduledEvents[${i}].id`, message: `duplicate event id '${e.id}'` });
+    }
+    seen.add(e.id);
+    if (typeof e.fireAtHour !== 'number' || e.fireAtHour < 0) {
+      errors.push({ path: `authoredScheduledEvents[${i}].fireAtHour`, message: `must be non-negative integer; got ${e.fireAtHour}` });
+    }
+    if (!e.outcomeOnFire?.revelation) {
+      errors.push({ path: `authoredScheduledEvents[${i}].outcomeOnFire.revelation`, message: 'missing required field' });
+    }
+  }
+}
+
+function checkCharactersShape(characters, errors) {
+  if (!Array.isArray(characters)) return;
+  const seen = new Set();
+  for (let i = 0; i < characters.length; i++) {
+    const c = characters[i];
+    if (!c.id) {
+      errors.push({ path: `characters[${i}].id`, message: 'missing required field' });
+      continue;
+    }
+    if (seen.has(c.id)) {
+      errors.push({ path: `characters[${i}].id`, message: `duplicate character id '${c.id}'` });
+    }
+    seen.add(c.id);
+    if (!c.name) errors.push({ path: `characters[${i}].name`, message: 'missing required field' });
+  }
+}
+
+export function validateWorldBundle(bundle) {
+  const errors = [];
+  if (!bundle || typeof bundle !== 'object') {
+    return { ok: false, errors: [{ path: '<root>', message: 'bundle is not an object' }] };
+  }
+  checkRequiredTop(bundle, BUNDLE_REQUIRED_TOP, '', errors);
+  if (bundle.objective)      checkRequiredTop(bundle.objective,      BUNDLE_OBJECTIVE_REQUIRED,       'objective', errors);
+  if (bundle.startingClocks) checkRequiredTop(bundle.startingClocks, BUNDLE_STARTING_CLOCKS_REQUIRED, 'startingClocks', errors);
+  if (bundle.playerStartingState) checkRequiredTop(bundle.playerStartingState, BUNDLE_PLAYER_REQUIRED, 'playerStartingState', errors);
+  checkThreatsShape(bundle.threats, errors);
+  checkScheduledEventsShape(bundle.authoredScheduledEvents, errors);
+  checkCharactersShape(bundle.characters, errors);
+  checkOpeningSceneShape(bundle.openingScene, errors);
+  return { ok: errors.length === 0, errors };
+}
+
 // ----- public API -----
 
 export function validateRuntimeState(state) {
@@ -341,7 +488,7 @@ export function validateModelOutput(output, { state, bundle }) {
   checkTerminalConsistency(output, state, errors);
   checkScheduledEventTimes(output, state, bundle, errors);
   checkMacroThreatRules(output, state, errors);
-  checkWorldStateEnums(output, errors);
+  checkWorldStateEnums(output, bundle, errors);
   checkNpcReferences(output, bundle, errors);
   checkUnlockThreatRefs(output, state, bundle, errors);
 

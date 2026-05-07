@@ -2,104 +2,366 @@
   "worldName": "ember-crown",
   "displayName": "The Ember Crown",
   "tagline": "A king dies. An era ends. You are the dreamer the crown chose.",
-  "voice": "Medieval fantasy, mythic-grim. Sparse, weighty prose. Stakes are felt; magic costs.",
-  "settingAndTone": "Medieval fantasy, mythic-grim. Sparse, weighty prose. Stakes are felt; magic costs.",
-  "structuralObjective": {
-    "thematic": "King Aldric dies. An era ends. The player is the catalyst — directly, indirectly, or through their absence. The path adapts to player choices; the objective does not.",
-    "climaxType": "Succession",
-    "climaxTypeRaw": "Succession (the dying king's power passes — to the player, to the antagonist, or to no one)"
-  },
+  "voice": "Medieval fantasy, mythic-grim. Sparse, weighty prose. Stakes are felt;\nmagic costs. NPCs are physical. Every choice has weight, even quiet ones.\n",
+  "settingAndTone": "Medieval fantasy, mythic-grim. The kingdom is on the cusp of a\nsuccession crisis; a true relic must pass to a true dreamer before a\nblood comet's zenith.\n",
   "worldBible": {
-    "geography": "Kingdom of Vael. Capital: Vael's Reach (walled city, river-bend, royal keep). Wren's Hollow (player's village, 4 days west). Eastern Road (the corridor between). Dead Pines (forest, midway). Various villages along the road.",
-    "magicTechRules": "Magic exists but is rare and costly. The Ember Crown is a true relic — it cannot be lifted by anyone who has not dreamed of it (they burn). Dreams from the Crown are real prophetic events, not metaphor. No teleportation, no resurrection, no instant communication.",
-    "factions": "The Old Faction (loyal to Aldric, want legitimate succession). Halric's Faction (planning to crown a puppet). The Temple (technically neutral but compromised). The Bandit Clans (chaotic, opportunistic). The dreaming bloodline (the player and rare others).",
-    "recentHistory": "Aldric has reigned 22 years — a stable golden age after a long civil war. The Ember Crown has not been worn in 300 years; the kingdom has been ruled by a circlet of state instead. Halric has been advisor for 8 years and has slowly built influence. The blood comet has been visible 3 weeks; in legend it heralds the death of kings.",
-    "currentCrisis": "Aldric is dying — slowly poisoned by Halric over months. The keep is sealed. Halric is positioning to crown a puppet successor. The blood comet approaches its zenith (4-5 days out). The dream has been waking the player for weeks.",
-    "themes": "Inheritance and refusal. The cost of power. Whether destiny is a gift or a theft. What it means to be chosen versus to choose."
+    "geography": "Kingdom of Vael. Capital: Vael's Reach (walled city, river-bend,\nroyal keep). Wren's Hollow (player's village, four days west).\nEastern Road (the corridor between). Dead Pines (forest, midway).\nVarious villages along the road.\n",
+    "magicTechRules": "Magic exists but is rare and costly. The Ember Crown is a true relic —\nit cannot be lifted by anyone who has not dreamed of it (they burn).\nDreams from the Crown are real prophetic events, not metaphor.\nNo teleportation, no resurrection, no instant communication.\n",
+    "factions": "The Old Faction (loyal to Aldric; want legitimate succession).\nHalric's Faction (planning to crown a puppet). The Temple\n(technically neutral but compromised). The Bandit Clans (chaotic,\nopportunistic). The dreaming bloodline (the player and rare others).\n",
+    "recentHistory": "Aldric has reigned 22 years — a stable golden age after a long civil\nwar. The Ember Crown has not been worn in 300 years; the kingdom has\nbeen ruled by a circlet of state instead. Halric has been advisor\nfor 8 years and has slowly built influence. The blood comet has been\nvisible 3 weeks; in legend it heralds the death of kings.\n",
+    "currentCrisis": "Aldric is dying — slowly poisoned by Halric over months. The keep is\nsealed. Halric is positioning to crown a puppet successor. The\nblood comet approaches its zenith. The dream has been waking the\nplayer for weeks.\n",
+    "themes": "Inheritance and refusal. The cost of power. Whether destiny is a gift\nor a theft. What it means to be chosen versus to choose.\n"
   },
-  "worldConstraints": "Magic exists but is rare and costly. The Ember Crown is a true relic — it cannot be lifted by anyone who has not dreamed of it (they burn). Dreams from the Crown are real prophetic events, not metaphor. No teleportation, no resurrection, no instant communication.",
-  "adaptationRules": "Defaults: (1) NPCs are physical and consistent — no teleportation. (2) Influence, never force — use dreams, encountered NPCs, ambient events; never bend physics. (3) Adapt the objective's FORM, not its existence. (4) The world has memory — NPCs remember player actions. (5) Honor every player choice as real, even disruptive ones.",
-  "pacingBudget": {
-    "targetBeatCount": 6,
-    "climaxByBeat": 6,
-    "tokensPerBeat": 1000,
-    "raw": "5-7 beats per playthrough. Climax must occur by beat 6-7. The opening beat is hardcoded; the AI generates beats 2 onward.",
-    "tokensRaw": "~1000 output tokens per turn. Resolution: 80-120 words. Beat intro: 150-200 words. Choices: one short sentence each."
+  "worldConstraints": "Magic exists but is rare and costly. The Ember Crown is a true relic —\nit cannot be lifted by anyone who has not dreamed of it (they burn).\nDreams from the Crown are real prophetic events, not metaphor.\nNo teleportation, no resurrection, no instant communication.\n",
+  "adaptationRules": "(1) NPCs are physical and consistent — no teleportation.\n(2) Influence, never force — use dreams, encountered NPCs, ambient\n    events; never bend physics.\n(3) Adapt the objective's FORM, not its existence.\n(4) The world has memory — NPCs remember player actions.\n(5) Honor every player choice as real, even disruptive ones.\n",
+  "worldStateEnums": {
+    "timeOfDay": [
+      "dawn",
+      "midday",
+      "dusk",
+      "night"
+    ],
+    "cometStage": [
+      "approaching",
+      "near-zenith",
+      "zenith",
+      "passing",
+      "passed"
+    ],
+    "kingStatus": [
+      "declining",
+      "dying",
+      "near-death",
+      "dead"
+    ],
+    "crownStatus": [
+      "dormant",
+      "held",
+      "activated",
+      "destroyed"
+    ],
+    "antagonistPower": [
+      "advisor",
+      "regent",
+      "crowned",
+      "king",
+      "dead"
+    ]
   },
+  "objective": {
+    "primary": "Reach the dying King Aldric.",
+    "failModes": [
+      "clock runs out",
+      "killed",
+      "trapped",
+      "jailed"
+    ],
+    "successCondition": "Stand at his bedside before he dies."
+  },
+  "startingClocks": {
+    "clockHours": 96,
+    "distanceToKing": 100
+  },
+  "startingWorldState": {
+    "timeOfDay": "dawn",
+    "cometStage": "approaching",
+    "kingStatus": "declining",
+    "crownStatus": "dormant",
+    "antagonistPower": "advisor"
+  },
+  "threats": [
+    {
+      "id": "halric-coronation",
+      "displayName": "Halric's Plan",
+      "icon": "crown-broken",
+      "duration": 96,
+      "phases": [
+        {
+          "atProgress": 0,
+          "label": "Brewing"
+        },
+        {
+          "atProgress": 40,
+          "label": "Moving"
+        },
+        {
+          "atProgress": 75,
+          "label": "Imminent"
+        }
+      ],
+      "unlockConditions": [
+        {
+          "type": "playerKnowsFact",
+          "fact": "halric-plotting-coronation"
+        }
+      ],
+      "interactions": [
+        {
+          "trigger": "messenger-intercepted",
+          "effect": "slow",
+          "amount": 12
+        },
+        {
+          "trigger": "halric-confronted-publicly",
+          "effect": "slow",
+          "amount": 18
+        }
+      ],
+      "onComplete": {
+        "worldStateDelta": {
+          "antagonistPower": "king",
+          "kingStatus": "dead"
+        },
+        "majorEvent": "Halric crowned his puppet. The keep flies black banners."
+      }
+    }
+  ],
+  "authoredScheduledEvents": [
+    {
+      "id": "comet-near-zenith-24h",
+      "fireAtHour": 24,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "worldStateDelta": {
+          "cometStage": "near-zenith"
+        },
+        "revelation": {
+          "strength": "ambient",
+          "delayHours": 0,
+          "content": "The comet hangs lower now, redder. It does not move, and it does not pass.\n"
+        }
+      },
+      "outcomeOnCancel": null
+    },
+    {
+      "id": "halric-searches-east-40h",
+      "fireAtHour": 40,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "npcImpacts": [
+          {
+            "npcId": "high-advisor-halric",
+            "statusDelta": "actively-searching",
+            "knowledgeGained": [
+              {
+                "fact": "dreamer-is-east-of-the-keep",
+                "confidence": "suspected"
+              }
+            ]
+          }
+        ],
+        "revelation": {
+          "strength": "quiet",
+          "delayHours": 6,
+          "content": "Travellers on the eastern road report stopped wagons — gray riders asking after a dreamer.\n"
+        }
+      },
+      "outcomeOnCancel": null
+    },
+    {
+      "id": "king-decline-48h",
+      "fireAtHour": 48,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "worldStateDelta": {
+          "kingStatus": "dying"
+        },
+        "revelation": {
+          "strength": "loud",
+          "delayHours": 0,
+          "content": "Bells toll in distant towers. The king is failing."
+        }
+      },
+      "outcomeOnCancel": null
+    },
+    {
+      "id": "comet-zenith-60h",
+      "fireAtHour": 60,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "worldStateDelta": {
+          "cometStage": "zenith"
+        },
+        "revelation": {
+          "strength": "ambient",
+          "delayHours": 0,
+          "content": "The comet sits at the top of the sky. It looks closer than the moon. The dreams come now even when you are awake.\n"
+        }
+      },
+      "outcomeOnCancel": null
+    },
+    {
+      "id": "king-decline-72h",
+      "fireAtHour": 72,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "worldStateDelta": {
+          "kingStatus": "near-death"
+        },
+        "revelation": {
+          "strength": "loud",
+          "delayHours": 0,
+          "content": "Word spreads on every road: the king will not see another dawn. The roadside shrines are full.\n"
+        }
+      },
+      "outcomeOnCancel": null
+    },
+    {
+      "id": "halric-closes-gates-75h",
+      "fireAtHour": 75,
+      "preconditions": [],
+      "outcomeOnFire": {
+        "npcImpacts": [
+          {
+            "npcId": "high-advisor-halric",
+            "statusDelta": "closing-the-keep"
+          }
+        ],
+        "revelation": {
+          "strength": "loud",
+          "delayHours": 4,
+          "content": "The gates of Vael's Reach are sealed. Halric's banners hang from the wall. Anyone hoping to enter must find another way.\n"
+        }
+      },
+      "outcomeOnCancel": null
+    }
+  ],
   "characters": [
     {
       "id": "sera",
       "name": "Sera",
       "role": "Messenger / Guide",
-      "physical": "Gaunt woman, mid-30s, weather-worn. Silver pin shaped like a flame on her cloak. Sword on her hip. Always slightly travel-stained — the urgency shows.",
-      "voice": "Terse, mission-focused, brusque urgency. Does not waste words. Uses imperatives. Italics in dialogue rare and meaningful when they happen.",
-      "motivations": "Get the dreamer to King Aldric in time. Loyal to the dying king's faction; loyal to the crown's rite. Will give her life for the mission.",
+      "physical": "Gaunt woman, mid-30s, weather-worn. Silver pin shaped like a flame\non her cloak. Sword on her hip. Always slightly travel-stained —\nthe urgency shows.\n",
+      "voice": "Terse, mission-focused, brusque urgency. Does not waste words.\nUses imperatives. Italics in dialogue rare and meaningful when\nthey happen.\n",
+      "motivations": "Get the dreamer to King Aldric in time. Loyal to the dying king's\nfaction; loyal to the crown's rite. Will give her life for the\nmission.\n",
       "allegiances": "The Old Faction. Sworn to Aldric personally. Distrusts Halric.",
       "startingLocation": "At the player's gate, Wren's Hollow.",
       "startingStatus": "Alive, healthy, four days' road dust on her.",
-      "knowledgeText": "Knows the king is dying of poisoning. Knows the dream-mark (can recognize a true dreamer). Does not know specifically that Halric is the poisoner — suspects but cannot prove.",
-      "notes": "Will not bend rules to find the player if they flee — she searches the village briefly, then rides on. Her competence is the player's leverage; her absence is a real cost."
+      "knowledgeText": "Knows the king is dying of poisoning. Knows the dream-mark (can\nrecognize a true dreamer). Suspects but cannot prove that Halric\nis the poisoner.\n",
+      "notes": "Will not bend rules to find the player if they flee — she searches\nthe village briefly, then rides on. Her competence is the player's\nleverage; her absence is a real cost.\n"
     },
     {
       "id": "king-aldric",
       "name": "King Aldric",
       "role": "Dying king / Plot center",
-      "physical": "Mid-40s, gaunt now (wasn't before), eyes still sharp when conscious. Wearing simple linen, not regalia. Bedridden, deteriorating fast.",
-      "voice": "Slow, deliberate, lucid in flashes. The voice of a man who has accepted dying. Compassionate; speaks to the player as an equal, not a subject.",
-      "motivations": "Pass the Ember Crown to a true dreamer before the comet's zenith, so the rite holds. Save the kingdom from Halric's puppet.",
+      "physical": "Mid-40s, gaunt now (wasn't before), eyes still sharp when conscious.\nWearing simple linen, not regalia. Bedridden, deteriorating fast.\n",
+      "voice": "Slow, deliberate, lucid in flashes. The voice of a man who has\naccepted dying. Compassionate; speaks to the player as an equal,\nnot a subject.\n",
+      "motivations": "Pass the Ember Crown to a true dreamer before the comet's zenith,\nso the rite holds. Save the kingdom from Halric's puppet.\n",
       "allegiances": "The kingdom itself. The crown's rite. His own legitimacy.",
       "startingLocation": "King's chamber, Vael's Reach keep.",
       "startingStatus": "Dying. Days, possibly hours. Conscious in flashes.",
-      "knowledgeText": "Knows he is being poisoned. Knows Halric is responsible. Knows the rite of the crown.",
-      "notes": "Will likely die in the climactic beat regardless of player path. The QUESTION is whether the player is present, late, or absent — and what they do at the bedside."
+      "knowledgeText": "Knows he is being poisoned. Knows Halric is responsible. Knows the\nrite of the crown.\n",
+      "notes": "Will likely die in the climactic beat regardless of player path.\nThe QUESTION is whether the player is present, late, or absent —\nand what they do at the bedside.\n"
     },
     {
       "id": "high-advisor-halric",
       "name": "High Advisor Halric",
       "role": "Antagonist",
-      "physical": "Tall, gray-haired, late 50s. Dark robes. A cold smile that never reaches his eyes. Always composed; never visibly hurried.",
-      "voice": "Cold, patient, intelligent. Polite to the point of mockery. Refers to people by formal title. Smiles when delivering bad news.",
-      "motivations": "Crown a puppet successor and rule through them. Eliminate or co-opt the true dreamer. Consolidate power before the comet passes.",
-      "allegiances": "Himself. His own faction (a small ring of conspirators in the keep).",
+      "physical": "Tall, gray-haired, late 50s. Dark robes. A cold smile that never\nreaches his eyes. Always composed; never visibly hurried.\n",
+      "voice": "Cold, patient, intelligent. Polite to the point of mockery. Refers\nto people by formal title. Smiles when delivering bad news.\n",
+      "motivations": "Crown a puppet successor and rule through them. Eliminate or co-opt\nthe true dreamer. Consolidate power before the comet passes.\n",
+      "allegiances": "Himself. His own faction (a small ring of conspirators in the keep).\n",
       "startingLocation": "Vael's Reach keep.",
       "startingStatus": "Healthy, scheming, increasingly impatient as the comet approaches.",
-      "knowledgeText": "Knows the crown's rite intimately. Knows the dreamer exists somewhere in the kingdom. Has people searching. Underestimates the player's agency.",
-      "notes": "Should be reasonable-seeming on first meeting. The horror is in his patience and competence, not in cartoon villainy. The Kingmaker ending hinges on the player choosing to weaponize this against him."
+      "knowledgeText": "Knows the crown's rite intimately. Knows the dreamer exists somewhere\nin the kingdom. Has people searching. Underestimates the player's\nagency.\n",
+      "notes": "Should be reasonable-seeming on first meeting. The horror is in his\npatience and competence, not in cartoon villainy.\n"
     }
   ],
-  "openingBeat": {
-    "title": "I. The Riders",
-    "setting": "Day 1, dawn, Wren's Hollow. Player at home. Three riders approaching the gate. Blood comet visible in eastern sky.",
-    "prose": "You wake to the sound of your own name being called. Outside, dawn is breaking thin and red over Wren's Hollow, and the blood comet hangs low in the east — a long wound across the sky. Hooves on the dirt road. Three riders. The lead one — a gaunt woman with a silver pin shaped like a flame — dismounts at your gate.\r\n\r\nYou have been dreaming of fire for weeks. A crown that burns the hand that wears it. A king on a bed that smells of ash. The dreams have been getting worse.\r\n\r\nShe is at your door. Her hand rises to knock.",
+  "playerStartingState": {
+    "location": "Wren's Hollow (own home)",
+    "condition": "tired",
+    "assets": [
+      "hunting knife",
+      "cloak",
+      "three days' food"
+    ],
+    "startingFacts": [
+      "you have dreamed of fire and a burning crown for weeks"
+    ]
+  },
+  "openingScene": {
+    "location": "Wren's Hollow, dawn",
+    "prose": {
+      "segments": [
+        {
+          "type": "text",
+          "content": "You wake to the sound of your own name being called. Outside, dawn is breaking thin and red over "
+        },
+        {
+          "type": "link",
+          "id": "ow-village",
+          "content": "Wren's Hollow",
+          "linkType": "lore"
+        },
+        {
+          "type": "text",
+          "content": ", and the "
+        },
+        {
+          "type": "link",
+          "id": "ow-comet",
+          "content": "blood comet",
+          "linkType": "lore"
+        },
+        {
+          "type": "text",
+          "content": " hangs low in the east — a long wound across the sky. Hooves on the dirt road. Three riders. The lead one — a gaunt woman with a "
+        },
+        {
+          "type": "link",
+          "id": "ow-pin",
+          "content": "silver pin shaped like a flame",
+          "linkType": "clue"
+        },
+        {
+          "type": "text",
+          "content": " — dismounts at your gate.\n\nYou have been dreaming of "
+        },
+        {
+          "type": "link",
+          "id": "ow-dream",
+          "content": "fire for weeks",
+          "linkType": "flavor"
+        },
+        {
+          "type": "text",
+          "content": ". A crown that burns the hand that wears it. A king on a bed that smells of ash. The dreams have been getting worse.\n\nShe is at your door. Her hand rises to knock."
+        }
+      ]
+    },
+    "linkContents": {
+      "ow-village": {
+        "content": "Your village. Four days west of Vael's Reach by horse. Quiet. The river bends here and the mill never quite catches up to the harvest.\n"
+      },
+      "ow-comet": {
+        "content": "An omen-bearer. The old songs say it crosses the sky once a generation, and a king dies. It has been visible for three weeks.\n"
+      },
+      "ow-pin": {
+        "content": "The mark of the Old Faction — the king's loyalists. You have heard it spoken of in your father's time, never since.\n",
+        "unlocksFacts": [
+          "rider-wears-old-faction-pin"
+        ]
+      },
+      "ow-dream": {
+        "content": "Always the same: you reach for the crown; the crown reaches for you. You wake before either touches.\n"
+      }
+    },
     "choices": [
       {
         "label": "A",
         "text": "Open the door before she can knock.",
-        "selfOther": 0.4,
-        "assertYield": 0.4
+        "risk": "controlled"
       },
       {
         "label": "B",
         "text": "Stay silent. Do not answer.",
-        "selfOther": -0.4,
-        "assertYield": 0.5
+        "risk": "risky"
       },
       {
         "label": "C",
         "text": "Slip out the back, into the woods.",
-        "selfOther": -0.6,
-        "assertYield": -0.4
+        "risk": "risky"
       }
     ]
-  },
-  "playerStartingState": {
-    "location": "Wren's Hollow (own home).",
-    "knowledgeText": "Has been dreaming of fire, a burning crown, and a king on a bed of ash for weeks. Does not know any specifics about who, where, or why. Has not connected the dreams to the comet visible in the sky.",
-    "inventory": [
-      "Hunting knife",
-      "Cloak",
-      "Three days' food"
-    ],
-    "condition": "Well-fed, healthy, sleep-deprived (the dream wakes them)."
   }
 }
