@@ -19,6 +19,7 @@
     "worldState",
     "threats",
     "scheduledEvents",
+    "pendingRevelations",
     "playerKnowledge",
     "npcStates",
     "runHistory",
@@ -62,6 +63,22 @@
       "type": "array",
       "description": "One-shot pending world events. Pre-populated from world bundle; model may append at runtime.",
       "items": { "$ref": "#/$defs/scheduledEventRuntime" }
+    },
+
+    "pendingRevelations": {
+      "type": "array",
+      "description": "Revelations from fired/cancelled scheduled events waiting on their delayHours before surfacing. When surfaceAtHour <= cumulative hours elapsed, the entry moves to playerKnowledge.witnessedEvents and is removed from this queue. Silent revelations are never enqueued here.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["eventId", "surfaceAtHour", "strength", "content"],
+        "properties": {
+          "eventId":       { "type": "string", "minLength": 1 },
+          "surfaceAtHour": { "type": "integer", "minimum": 0 },
+          "strength":      { "$ref": "#/$defs/revelationStrength" },
+          "content":       { "type": "string" }
+        }
+      }
     },
 
     "playerKnowledge":    { "$ref": "#/$defs/playerKnowledge" },

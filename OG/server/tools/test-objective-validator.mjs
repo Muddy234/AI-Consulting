@@ -91,6 +91,7 @@ function makeState(overrides = {}) {
       }
     },
     scheduledEvents: [],
+    pendingRevelations: [],
     playerKnowledge: {
       knownThreatIds: ['halric-coronation'],
       witnessedEvents: [], rumors: [], investigatedFacts: []
