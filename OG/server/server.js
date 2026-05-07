@@ -1,6 +1,6 @@
 // Ember Crown — local middleman server.
 // Bridges browser <-> Claude Agent SDK using the staged-turn write-ahead flow
-// described in IMPLEMENTATION_PLAN.md §5.
+// described in OBJECTIVE_REFACTOR_PLAN.md.
 
 import express from 'express';
 import cors from 'cors';
@@ -15,7 +15,6 @@ import {
   DEFAULT_WORLD,
   RECENT_HISTORY_BEATS
 } from './lib/config.mjs';
-import { convertXlsxToBundle } from './tools/xlsx-to-bundle.mjs';
 import { loadWorldBundle, getCachedBundle, knownNpcIds } from './lib/world-bundle.mjs';
 import { readState, writeState, deleteState } from './lib/state-store.mjs';
 import {
@@ -46,12 +45,6 @@ function ensureDirs() {
 
 function bootstrap() {
   ensureDirs();
-  // Regenerate world bundle if xlsx is newer (mtime-aware, silent on no-op).
-  try {
-    convertXlsxToBundle({ silent: true });
-  } catch (err) {
-    console.error('[boot] xlsx converter failed:', err.message);
-  }
   // Load + validate world bundle (throws on invalid).
   loadWorldBundle(DEFAULT_WORLD);
 

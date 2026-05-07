@@ -19,7 +19,7 @@ export function bundlePath(worldName) {
 export function loadWorldBundle(worldName) {
   const p = bundlePath(worldName);
   if (!fs.existsSync(p)) {
-    throw new Error(`World bundle not found: ${p}. Run tools/xlsx-to-bundle.mjs first.`);
+    throw new Error(`World bundle not found: ${p}.`);
   }
 
   let raw;
@@ -32,8 +32,7 @@ export function loadWorldBundle(worldName) {
   const result = validateWorldBundle(raw);
   if (!result.ok) {
     throw new Error(
-      `World bundle failed validation (${p}):\n${formatErrors(result.errors)}\n` +
-      `Fix the xlsx and re-run the converter, or edit world.json directly.`
+      `World bundle failed validation (${p}):\n${formatErrors(result.errors)}`
     );
   }
 

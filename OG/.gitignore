@@ -1,6 +1,4 @@
 node_modules/
 state/
 logs/
-xlsx-dump.txt
-read-xlsx.ps1
 *.tmp

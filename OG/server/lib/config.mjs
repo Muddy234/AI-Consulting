@@ -15,7 +15,6 @@ export const STATE_DIR = path.join(PROJECT_ROOT, 'state');
 export const LOGS_DIR = path.join(PROJECT_ROOT, 'logs');
 
 export const DEFAULT_WORLD = 'ember-crown';
-export const DEFAULT_XLSX = path.join(PROJECT_ROOT, 'showrunner-world-template.xlsx');
 
 export const MODEL = process.env.EMBER_MODEL || 'claude-opus-4-6';
 export const PORT = 3000;

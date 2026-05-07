@@ -14,6 +14,7 @@ Removed (made the game readable, not exciting):
 - 2x2 mood-quadrant choice metadata
 - `selfOtherSum` / `assertYieldSum` hidden quadrant ending math
 - HUD widgets for distance, heat, assets, moves
+- xlsx authoring format and the `xlsx-to-bundle.mjs` converter (structured prose with hyperlinks doesn't fit in cells; replaced with hand-authored YAML — see §2)
 
 Added (the world is alive whether or not you're watching):
 - Living-world simulator: `worldState` (always true, always ticked) vs. `playerKnowledge` (curated subset surfaced through prose / hyperlinks)
@@ -373,10 +374,15 @@ Retained from rev 1:
 }
 ```
 
-`xlsx-to-bundle.mjs` updates:
-- Drop `pacingBudget` / `openingBeat` mappings
-- Add `objective` / `startingClocks` / `threats[]` / `authoredScheduledEvents[]` / `openingScene` mappings
-- New xlsx sheets: `Threats`, `ScheduledEvents`, `OpeningScene` (with link rows)
+`xlsx-to-bundle.mjs` and `showrunner-world-template.xlsx` have been removed. World bundles are now hand-authored as **YAML** (`worlds/<name>/world.yaml`) — much better fit for structured prose with hyperlinks, threat phase tables, and nested scheduled-event payloads than spreadsheet cells.
+
+**Authoring flow:**
+- Source of truth: `worlds/<name>/world.yaml` (committed)
+- Build artifact: `worlds/<name>/world.json` (gitignored; regenerated from YAML at server boot)
+- Boot step (Phase C deliverable): a small `lib/yaml-to-bundle.mjs` (~30 lines using `js-yaml`) parses the YAML, writes JSON, then `loadWorldBundle` proceeds as today.
+- New dependency: `js-yaml` (replaces `adm-zip`).
+
+The world bundle's *content* (the JSON shape) is unchanged from §1.2 of this plan — only the authoring source format changes.
 
 Tentpole event count for Ember Crown v1: **5–8 authored scheduled events** (king's decline thresholds, Halric phase-shifts, comet zenith, etc.) plus the macro-threat. Final count is open question §7.
 
@@ -509,7 +515,7 @@ All terminal screens are **model-authored** with `runHistory` and the relevant t
 |-------|------------------------------------------------------------------------------------------|------------------------------------------------------------|
 | **A** | Schema spec files (`server/schemas/objective.{model-output,runtime-state}.json`)         | User signs off on contract                                 |
 | **B** | Validator updates per §1.4                                                               | `test-validator.mjs` green                                 |
-| **C** | World bundle migration; `xlsx-to-bundle.mjs` updated; tentpole events authored           | Bundle loads + revalidates                                 |
+| **C** | World bundle migration to YAML; `lib/yaml-to-bundle.mjs` boot-step; `world.yaml` authored with new schema + tentpole events | Bundle loads + revalidates                                 |
 | **D** | Threat engine (tick, phase, slowdown, completion)                                        | `test-threat-engine.mjs` green                             |
 | **E** | Scheduled-events engine (precondition, fire/cancel, revelation queue)                    | `test-scheduled-events.mjs` green                          |
 | **F** | Knowledge layer + revelation routing into prompt                                         | `test-knowledge-layer.mjs` green                           |
@@ -539,7 +545,7 @@ All design questions from review are resolved and folded into the spec above. Su
 12. **Hyperlink idempotency:** first-click only per `linkId` per beat. Re-clicking shows the cached content with no additional `costHours` and no additional unlocks.
 13. **Threat slowed past 0:** `effectiveProgress = max(0, progress - slowedBy)`. When a known threat's effective progress hits 0, the HUD meter is removed; the threat object remains in state with `knownToPlayer: true`. If new progress later exceeds `slowedBy`, the meter slides back in and the model is flagged to acknowledge the resurgence in prose.
 14. **Off-screen threat completion forcing the ending:** completion fires regardless of player knowledge. The ending screen is model-authored from `runHistory` plus a flag for whether the player ever learned of the threat. The ironic case (silent completion → player discovers it only at the end) is a first-class ending shape, not an edge case.
-15. **Hyperlinks in the openingScene:** yes — opening prose carries hyperlinks authored in the world bundle. xlsx authoring template gains a links sheet (see §2).
+15. **Hyperlinks in the openingScene:** yes — opening prose carries hyperlinks authored in the YAML world bundle (see §2).
 
 ---
 
@@ -569,7 +575,7 @@ All design questions from review are resolved and folded into the spec above. Su
 | Hyperlink budget balloons output tokens                  | Validator caps links/beat; per-link content ≤ 50 words; cost monitored in log |
 | Counterfactuals fire silently and player never feels weight | Default revelation `quiet`+delayed; only ~30% truly silent. Phase K subjective check |
 | Player misses the "earned HUD" mechanic and never investigates | Tentpole events surface loudly enough to teach the convention in run 1; world bible mentions investigation in opening prose |
-| Tentpole authoring is tedious                            | Limit to 5–8 per world; provide xlsx sheets with consistent shape       |
+| Tentpole authoring is tedious                            | Limit to 5–8 per world; YAML authoring with documented schema and examples in `worlds/ember-crown/world.yaml` |
 | Threat slowdown encourages spam-disrupt play             | Slowdowns require `desperate` choices and have authored caps per threat |
 | Investigation cost balance feels punishing or trivial    | Phase K tuning; world bundle controls per-link `costHours` defaults     |
 
