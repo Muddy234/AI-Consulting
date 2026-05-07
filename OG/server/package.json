@@ -13,7 +13,8 @@
     "test:knowledge-layer": "node tools/test-knowledge-layer.mjs",
     "test:objective-prompt-composer": "node tools/test-objective-prompt-composer.mjs",
     "test:hyperlink-flow": "node tools/test-hyperlink-flow.mjs",
-    "test:objective-orchestrator": "node tools/test-objective-orchestrator.mjs"
+    "test:objective-orchestrator": "node tools/test-objective-orchestrator.mjs",
+    "test:history": "node tools/test-history.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.0",

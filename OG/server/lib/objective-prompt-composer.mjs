@@ -34,6 +34,55 @@ In closing scenes, the same rule: the resolution shows the moment, the
 cost; it lets the player remember what they saw three beats ago and
 didn't act on. Give them the synthesis, never deliver it.`;
 
+export const NARRATIVE_CRAFT = `[NARRATIVE CRAFT]
+The prose's job is to make the player need to know what happens next.
+This is craft, not magic — there are techniques.
+
+Pacing
+- Short sentences carry tension. Longer sentences earn breath.
+- Hard cuts beat establishing shots. Drop the reader into the moment;
+  do not pan toward it.
+- A beat's intro should end on a hinge — a sound nearby, a door opening,
+  a face turning, a hand rising — that the choices then resolve.
+- Resolution prose opens with the consequence, not the deliberation.
+    Yes: "You ride. The dust does not settle."
+    No:  "You decided to ride east. As you traveled, you noticed..."
+
+Body and senses
+- Anchor every beat to the protagonist's body. Breath, weight, cold,
+  the hand on the hilt, the catch of a held inhalation. Interior
+  experience belongs in physical detail, not in stated thought.
+- Use one or two concrete sensory details per paragraph. A specific
+  smell. A particular sound. A single small object. Generic atmosphere
+  ("dark and ominous") is the failure mode.
+
+Verbs and naming
+- Active verbs. The world acts on the player; the player acts on the
+  world. "The road thins." "The candle gutters." Avoid was/were/being
+  unless the rhythm needs them.
+- Name things confidently. "The Dead Pines," not "a dark forest."
+  "Halric's faction," not "the antagonists." Specificity is texture,
+  and texture is conviction.
+
+Withholding
+- Do not explain what the prose has not earned. If a character's motive
+  can be guessed from their hands, do not describe the motive. If a
+  threat is implied by a detail, do not name the threat.
+- Backstory belongs in beats where the player's choice invites it.
+  Never in beats where it would slow them down.
+
+Length budgets
+- Resolution prose:  60-120 words. The consequence, the cost, one
+                     image to carry forward.
+- Beat intro:        120-200 words. The setting, the tension, the
+                     people, the hinge.
+- Choice text:       a single sentence each. Active. The verb works.
+
+Hooks
+- The last line of any beat's intro should make the reader want to
+  click a choice — not finish reading something. End on motion, not
+  exposition. A held breath. A footstep. A door's small sound.`;
+
 export const NPC_INVENTION_RULES = `[NPC INVENTION RULES]
 - You may name and use background NPCs in prose freely (a passing merchant,
   a kitchen mistress, a wounded soldier on the road). The world should feel
@@ -201,6 +250,7 @@ export function composeSystemPrompt(bundle) {
   const sections = [
     renderVoice(bundle),
     PROSE_DISCIPLINE,
+    NARRATIVE_CRAFT,
     renderObjective(bundle),
     renderSettingAndTone(bundle),
     renderWorldBible(bundle),

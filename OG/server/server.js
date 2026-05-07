@@ -26,6 +26,7 @@ import { acquire } from './lib/lock.mjs';
 import { initGame, submitChoice, openLink } from './lib/objective-orchestrator.mjs';
 import { defaultModelClient } from './lib/model-client.mjs';
 import { buildKnowledgeView } from './lib/knowledge-layer.mjs';
+import { buildRecentHistory } from './lib/history.mjs';
 
 // ---------- boot ----------
 
@@ -138,10 +139,12 @@ app.post('/turn', async (req, res) => {
 
     const lastBeat = lastPresentedBeat(gameId);
     const choicesPresented = lastBeat?.choices ?? lastBeat?.nextBeat?.choices ?? [];
+    const recentHistory = buildRecentHistory(gameId);
 
     const result = await submitChoice(state, bundle, {
       choiceLabel: choice,
       choicesPresented,
+      recentHistory,
       modelClient: defaultModelClient
     });
 
@@ -155,7 +158,11 @@ app.post('/turn', async (req, res) => {
     persist(gameId, state);
     logTurn(gameId, state.turnNumber, {
       playerChoice: choice,
-      modelOutput: { presentedBeat: result.response.nextBeat ?? result.response, raw: result.log?.output ?? null },
+      modelOutput: {
+        presentedBeat: result.response.nextBeat ?? result.response,
+        resolution:    result.response.resolutionProse ?? null,
+        raw:           result.log?.output ?? null
+      },
       intendedStateAfter: state,
       notes: result.retried ? 'retried-once' : null
     });

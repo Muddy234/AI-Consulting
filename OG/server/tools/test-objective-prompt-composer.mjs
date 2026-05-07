@@ -10,6 +10,7 @@ import {
   composeUserPrompt,
   composePrompt,
   PROSE_DISCIPLINE,
+  NARRATIVE_CRAFT,
   NPC_INVENTION_RULES,
   KNOWLEDGE_ISOLATION_RULE,
   LETHALITY_BUDGET,
@@ -122,6 +123,8 @@ console.log('--- system prompt: structure ---');
   ok('adaptation rules block present',            contains(sys, '[ADAPTATION RULES]'));
   ok('character roster block present',            contains(sys, '[CHARACTER ROSTER]'));
   ok('prose discipline included',                 contains(sys, PROSE_DISCIPLINE));
+  ok('narrative craft block included',            contains(sys, NARRATIVE_CRAFT));
+  ok('narrative craft block present (header)',    contains(sys, '[NARRATIVE CRAFT]'));
   ok('npc invention rules included',              contains(sys, NPC_INVENTION_RULES));
   ok('knowledge isolation rule included',         contains(sys, KNOWLEDGE_ISOLATION_RULE));
   ok('lethality budget included',                 contains(sys, LETHALITY_BUDGET));
@@ -185,6 +188,29 @@ console.log('\n--- system prompt: difficulty layering (foreshadowing + tiers + s
   ok('output reminder mentions directorReasoning for foreshadowing notes',
      contains(sys, 'directorReasoning') &&
      contains(sys, 'foreshadowing'));
+  // NARRATIVE CRAFT — concrete craft levers
+  ok('craft: pacing — short for tension',
+     contains(sys, 'Short sentences carry tension'));
+  ok('craft: hard cuts beat establishing shots',
+     contains(sys, 'Hard cuts beat establishing shots'));
+  ok('craft: hinge ending for intros',
+     contains(sys, 'end on a hinge'));
+  ok('craft: resolution opens with consequence',
+     contains(sys, 'consequence, not the deliberation'));
+  ok('craft: anchor to body',
+     contains(sys, "protagonist's body"));
+  ok('craft: concrete sensory detail',
+     contains(sys.toLowerCase(), 'concrete sensory'));
+  ok('craft: active verbs preferred',
+     contains(sys, 'Active verbs'));
+  ok('craft: name things confidently',
+     contains(sys, 'Name things confidently'));
+  ok('craft: withholding rule',
+     contains(sys, 'Do not explain what the prose has not earned'));
+  ok('craft: length budget per slot',
+     contains(sys, 'Resolution prose:') && contains(sys, 'Beat intro:') && contains(sys, 'Choice text:'));
+  ok('craft: end-on-motion hook',
+     contains(sys, 'End on motion'));
 }
 
 console.log('\n--- system prompt: rev-2 removals ---');
