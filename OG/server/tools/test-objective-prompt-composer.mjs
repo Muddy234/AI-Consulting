@@ -10,7 +10,6 @@ import {
   composeUserPrompt,
   composePrompt,
   PROSE_DISCIPLINE,
-  NARRATIVE_CRAFT,
   NPC_INVENTION_RULES,
   KNOWLEDGE_ISOLATION_RULE,
   LETHALITY_BUDGET,
@@ -117,14 +116,10 @@ console.log('--- system prompt: structure ---');
   ok('prose discipline block present',            contains(sys, '[PROSE DISCIPLINE]'));
   ok('objective block present',                   contains(sys, '[OBJECTIVE]'));
   ok('objective primary line included',           contains(sys, 'Reach the dying King Aldric'));
-  ok('setting & tone block present',              contains(sys, '[SETTING & TONE]'));
   ok('world bible block present',                 contains(sys, '[WORLD BIBLE]'));
-  ok('world constraints block present',           contains(sys, '[WORLD CONSTRAINTS]'));
   ok('adaptation rules block present',            contains(sys, '[ADAPTATION RULES]'));
   ok('character roster block present',            contains(sys, '[CHARACTER ROSTER]'));
   ok('prose discipline included',                 contains(sys, PROSE_DISCIPLINE));
-  ok('narrative craft block included',            contains(sys, NARRATIVE_CRAFT));
-  ok('narrative craft block present (header)',    contains(sys, '[NARRATIVE CRAFT]'));
   ok('npc invention rules included',              contains(sys, NPC_INVENTION_RULES));
   ok('knowledge isolation rule included',         contains(sys, KNOWLEDGE_ISOLATION_RULE));
   ok('lethality budget included',                 contains(sys, LETHALITY_BUDGET));
@@ -158,8 +153,7 @@ console.log('\n--- system prompt: difficulty layering (foreshadowing + tiers + s
   ok('lethality has the show-don\'t-name resolution rule',
      contains(sys, 'never names the foreshadowed thing') ||
      contains(sys, 'chain takes your leg'));
-  ok('lethality has named-loss vocabulary',
-     contains(sys, 'spotted') &&
+  ok('lethality has named-loss vocabulary (trimmed to 2)',
      contains(sys, 'fled-and-caught') &&
      contains(sys, 'shortcut-broke-leg'));
   // CHOICE AUTHORING
@@ -181,36 +175,31 @@ console.log('\n--- system prompt: difficulty layering (foreshadowing + tiers + s
      contains(sys, 'foreshadowing contract'));
   // ENDING
   ok('ending tells model to name the deal',
-     contains(sys, 'NAME THE DEAL'));
-  ok('ending has imply-never-announce close',
-     contains(sys, 'Imply, never announce'));
-  // OUTPUT
+     contains(sys, 'name the deal'));
+  ok('ending has dead-pines example or run-of-caution phrasing',
+     contains(sys, 'Dead Pines') || contains(sys, 'run of caution'));
+  // OUTPUT — schema + length budgets (moved from craft block)
   ok('output reminder mentions directorReasoning for foreshadowing notes',
      contains(sys, 'directorReasoning') &&
      contains(sys, 'foreshadowing'));
-  // NARRATIVE CRAFT — concrete craft levers
-  ok('craft: pacing — short for tension',
-     contains(sys, 'Short sentences carry tension'));
-  ok('craft: hard cuts beat establishing shots',
-     contains(sys, 'Hard cuts beat establishing shots'));
-  ok('craft: hinge ending for intros',
-     contains(sys, 'end on a hinge'));
-  ok('craft: resolution opens with consequence',
-     contains(sys, 'consequence, not the deliberation'));
-  ok('craft: anchor to body',
-     contains(sys, "protagonist's body"));
-  ok('craft: concrete sensory detail',
-     contains(sys.toLowerCase(), 'concrete sensory'));
-  ok('craft: active verbs preferred',
-     contains(sys, 'Active verbs'));
-  ok('craft: name things confidently',
-     contains(sys, 'Name things confidently'));
-  ok('craft: withholding rule',
-     contains(sys, 'Do not explain what the prose has not earned'));
-  ok('craft: length budget per slot',
-     contains(sys, 'Resolution prose:') && contains(sys, 'Beat intro:') && contains(sys, 'Choice text:'));
-  ok('craft: end-on-motion hook',
-     contains(sys, 'End on motion'));
+  ok('output has length budgets',
+     contains(sys, 'Length budgets') &&
+     contains(sys, 'resolutionProse') &&
+     contains(sys, 'nextBeat.intro'));
+}
+
+console.log('\n--- system prompt: no over-engineering of craft ---');
+{
+  const sys = composeSystemPrompt(bundle);
+  ok('NO standalone NARRATIVE CRAFT block (craft prescribed via voice + recent history)',
+     !contains(sys, '[NARRATIVE CRAFT]'));
+  ok('NO duplicate WORLD CONSTRAINTS block (info lives in worldBible)',
+     !contains(sys, '[WORLD CONSTRAINTS]'));
+  ok('NO duplicate SETTING & TONE block (info lives in voice)',
+     !contains(sys, '[SETTING & TONE]'));
+  ok('total prompt is materially smaller than the prior bloated version',
+     sys.length < 13000,
+     `prompt length: ${sys.length} chars`);
 }
 
 console.log('\n--- system prompt: rev-2 removals ---');

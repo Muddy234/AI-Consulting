@@ -20,68 +20,14 @@ import { buildKnowledgeView } from './knowledge-layer.mjs';
 // ============================================================
 
 export const PROSE_DISCIPLINE = `[PROSE DISCIPLINE]
-Imply, never announce. The world reveals itself through concrete detail —
-the things a person at the scene would actually notice — and the player
-synthesizes meaning. Never tell the player what to think. Never have an
-NPC explain their motivation in dialogue when their hands or silence can
-do it. Never have prose say "this is dangerous"; show what makes it so.
+Imply, never announce. Show the concrete details a person at the scene
+would actually notice; let the player synthesize meaning. Never have
+prose say "this is dangerous" — show what makes it so. Never have an
+NPC explain their motive when their hands or silence can do it.
 
-This applies to hyperlink contents especially. A clue's text does not
-identify the threat — it shows the evidence. The player who connects the
-dots earns the warning. The player who doesn't pays for the gap.
-
-In closing scenes, the same rule: the resolution shows the moment, the
-cost; it lets the player remember what they saw three beats ago and
-didn't act on. Give them the synthesis, never deliver it.`;
-
-export const NARRATIVE_CRAFT = `[NARRATIVE CRAFT]
-The prose's job is to make the player need to know what happens next.
-This is craft, not magic — there are techniques.
-
-Pacing
-- Short sentences carry tension. Longer sentences earn breath.
-- Hard cuts beat establishing shots. Drop the reader into the moment;
-  do not pan toward it.
-- A beat's intro should end on a hinge — a sound nearby, a door opening,
-  a face turning, a hand rising — that the choices then resolve.
-- Resolution prose opens with the consequence, not the deliberation.
-    Yes: "You ride. The dust does not settle."
-    No:  "You decided to ride east. As you traveled, you noticed..."
-
-Body and senses
-- Anchor every beat to the protagonist's body. Breath, weight, cold,
-  the hand on the hilt, the catch of a held inhalation. Interior
-  experience belongs in physical detail, not in stated thought.
-- Use one or two concrete sensory details per paragraph. A specific
-  smell. A particular sound. A single small object. Generic atmosphere
-  ("dark and ominous") is the failure mode.
-
-Verbs and naming
-- Active verbs. The world acts on the player; the player acts on the
-  world. "The road thins." "The candle gutters." Avoid was/were/being
-  unless the rhythm needs them.
-- Name things confidently. "The Dead Pines," not "a dark forest."
-  "Halric's faction," not "the antagonists." Specificity is texture,
-  and texture is conviction.
-
-Withholding
-- Do not explain what the prose has not earned. If a character's motive
-  can be guessed from their hands, do not describe the motive. If a
-  threat is implied by a detail, do not name the threat.
-- Backstory belongs in beats where the player's choice invites it.
-  Never in beats where it would slow them down.
-
-Length budgets
-- Resolution prose:  60-120 words. The consequence, the cost, one
-                     image to carry forward.
-- Beat intro:        120-200 words. The setting, the tension, the
-                     people, the hinge.
-- Choice text:       a single sentence each. Active. The verb works.
-
-Hooks
-- The last line of any beat's intro should make the reader want to
-  click a choice — not finish reading something. End on motion, not
-  exposition. A held breath. A footstep. A door's small sound.`;
+This is load-bearing for hyperlinks: a clue shows evidence, never names
+the threat. The player who connects the dots earns the warning. The
+player who doesn't pays for the gap.`;
 
 export const NPC_INVENTION_RULES = `[NPC INVENTION RULES]
 - You may name and use background NPCs in prose freely (a passing merchant,
@@ -110,17 +56,11 @@ Risk tiers map to outcome bands. The validator enforces the ceilings:
                 exhausted / dying. NEVER remove more than one asset.
                 NEVER terminal. The player chose carefully; honor that.
   risky       - Real cost is the DEFAULT. The player invited it.
-                Vocabulary of honest costs:
-                  * spotted             - heat rises, surprise lost,
-                                          encounter risk on next move
+                Examples of honest cost:
+                  * shortcut-broke-leg  - condition -> wounded, distance
+                                          reverses, hours lost
                   * fled-and-caught     - captured-and-released, hours
                                           lost, asset surrendered
-                  * shortcut-broke-leg  - condition -> wounded, distance
-                                          reverses or stalls, hours lost
-                  * ally-hurt           - sera or another NPC takes a
-                                          wound the player didn't plan
-                  * relationship-frayed - NPC's currentKnowledge gains
-                                          a fact about the player's failure
                 Terminal still off-limits.
   desperate   - Terminal becomes legal (killed / trapped / jailed) AND
                 the upside is biggest: large distance gains, threat
@@ -149,24 +89,18 @@ they saw three beats ago. The synthesis is theirs.`;
 
 export const CHOICE_AUTHORING = `[CHOICE AUTHORING]
 Each choice's text signals its risk through tone, not labels:
-  controlled  - methodical, deliberate
-                ("Wait until first light", "Take the road, despite the time")
-  risky       - names the unknown
-                ("...if the road holds", "Slip past the watchman if you can")
-  desperate   - names the gamble explicitly
-                ("Alone, into the dark", "Cut the rope and pray",
-                 "Fight your way out")
+  controlled  - methodical ("Take the road, despite the time")
+  risky       - names the unknown ("...if the road holds")
+  desperate   - names the gamble ("Alone, into the dark")
 
-Default to including at least one 'controlled' option per beat. Omit the
-controlled option only when the dramatic situation truly forecloses it
-— already mid-fight, already on the run, already cornered. The player
-should usually have an out; their loss should come from declining to
-take it.
+Default to including at least one 'controlled' option per beat. Omit
+only when the dramatic situation forecloses it (already mid-fight,
+already cornered). The player should usually have an out; their loss
+should come from declining to take it.
 
-The risk tag itself is internal — the UI never displays it as a colored
-badge. The player reads the gradient through choice text and prose
-framing. When you set risk='desperate', the choice text MUST contain
-language that broadcasts the gamble.`;
+The risk tag is internal — never displayed as a colored badge. The
+player reads the gradient through choice text. When risk='desperate',
+the choice text MUST broadcast the gamble.`;
 
 export const HYPERLINK_INSTRUCTION = `[HYPERLINKS]
 Author 0-6 hyperlinks per beat. Tag each by linkType:
@@ -216,30 +150,35 @@ export const ENDING_TRIGGER = `[ENDING TRIGGER]
 If distanceToKing <= 5 after applying your deltas, set
 narrativeResponse.terminalState.kind = 'reached-king' and write the
 bedside scene. The mood is shaped by runHistory (which threats completed,
-which the player stopped, which they never learned existed) - not by
-your script.
+which the player stopped, which they never learned existed).
 If clockHours - clockHoursDelta <= 0, the engine forces a 'time-up'
 ending on the next turn. If a forced-end threat completes off-screen,
 the engine emits its own ending. Do not author 'time-up', 'killed',
-'trapped', or 'jailed' on a non-terminal beat unless the lethality
-budget conditions are met.
+'trapped', or 'jailed' on a non-terminal beat unless lethality conditions
+are met.
 
-When you author a terminal scene, NAME THE DEAL the player made — but
+When you author a terminal scene, name the deal the player made —
 through evidence, not exposition. "You took the Dead Pines because they
-were faster. The roots remembered." "You waited for daylight, three
-times. The bells were tolling as you reached the gates." Let the player
-recognize the moment they made the choice that brought them here, or
-the run of caution that ate the clock. Imply, never announce.`;
+were faster. The roots remembered." Let the player recognize the moment
+they made the choice that brought them here, or the run of caution that
+ate the clock.`;
 
 export const OUTPUT_SCHEMA_REMINDER = `[OUTPUT]
 Return a single JSON object matching the objective.model-output schema:
 worldImpacts, npcImpacts, narrativeResponse, forwardProjection,
 directorReasoning. Do not include any text outside the JSON object.
+
+Length budgets:
+  resolutionProse  60-120 words. The consequence, the cost.
+  nextBeat.intro   120-200 words. Setting, tension, the hinge.
+  choice text      one active sentence each.
+
 Choices: 2-4 entries with labels A..D, each carrying a risk tag
 (controlled / risky / desperate) used by the lethality gate.
+
 Use directorReasoning to note foreshadowing intent ("planting traps clue
 for likely Dead Pines route") or consistency callbacks ("honoring the
-cottage clue from beat 3"). That field is logged but not shown to the
+cottage clue from beat 3"). That field is logged, never shown to the
 player.`;
 
 // ============================================================
@@ -250,11 +189,8 @@ export function composeSystemPrompt(bundle) {
   const sections = [
     renderVoice(bundle),
     PROSE_DISCIPLINE,
-    NARRATIVE_CRAFT,
     renderObjective(bundle),
-    renderSettingAndTone(bundle),
     renderWorldBible(bundle),
-    renderWorldConstraints(bundle),
     renderAdaptationRules(bundle),
     renderCharacterRoster(bundle),
     NPC_INVENTION_RULES,
@@ -325,11 +261,6 @@ function renderObjective(bundle) {
   ].filter(Boolean).join('\n');
 }
 
-function renderSettingAndTone(bundle) {
-  if (!bundle?.settingAndTone) return null;
-  return `[SETTING & TONE]\n${bundle.settingAndTone.trim()}`;
-}
-
 function renderWorldBible(bundle) {
   const wb = bundle?.worldBible;
   if (!wb || typeof wb !== 'object') return null;
@@ -340,11 +271,6 @@ function renderWorldBible(bundle) {
     }
   }
   return lines.length > 1 ? lines.join('\n\n') : null;
-}
-
-function renderWorldConstraints(bundle) {
-  if (!bundle?.worldConstraints) return null;
-  return `[WORLD CONSTRAINTS]\n${bundle.worldConstraints.trim()}`;
 }
 
 function renderAdaptationRules(bundle) {
