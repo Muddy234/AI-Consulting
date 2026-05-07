@@ -19,6 +19,21 @@ import { buildKnowledgeView } from './knowledge-layer.mjs';
 // Constant prompt sections (system prompt rules + instructions)
 // ============================================================
 
+export const PROSE_DISCIPLINE = `[PROSE DISCIPLINE]
+Imply, never announce. The world reveals itself through concrete detail —
+the things a person at the scene would actually notice — and the player
+synthesizes meaning. Never tell the player what to think. Never have an
+NPC explain their motivation in dialogue when their hands or silence can
+do it. Never have prose say "this is dangerous"; show what makes it so.
+
+This applies to hyperlink contents especially. A clue's text does not
+identify the threat — it shows the evidence. The player who connects the
+dots earns the warning. The player who doesn't pays for the gap.
+
+In closing scenes, the same rule: the resolution shows the moment, the
+cost; it lets the player remember what they saw three beats ago and
+didn't act on. Give them the synthesis, never deliver it.`;
+
 export const NPC_INVENTION_RULES = `[NPC INVENTION RULES]
 - You may name and use background NPCs in prose freely (a passing merchant,
   a kitchen mistress, a wounded soldier on the road). The world should feel
@@ -37,29 +52,100 @@ knowledge field shown — they are off-stage, and you do not have access to
 what they currently know. Do not have them reference facts they would not
 know. Do not surface plot threads the player has not encountered.`;
 
-export const LETHALITY_BUDGET = `[LETHALITY]
-Death, traps, and jail (terminalState.kind in killed/trapped/jailed) are
-only legal when the player chose 'desperate' AND failed. On 'controlled'
-or 'risky' choices you may surprise the player with non-lethal
-consequences — a stolen horse, a poisoned wound, an ally's trust shaken,
-heat rising — but never with termination. Keep desperate outcomes
-sparingly real; they should feel earned, not arbitrary.`;
+export const LETHALITY_BUDGET = `[LETHALITY & CONSEQUENCE]
+
+Risk tiers map to outcome bands. The validator enforces the ceilings:
+
+  controlled  - Minimal friction at most. Time spent, mild NPC mood shift,
+                ambient pressure. NEVER push condition to wounded /
+                exhausted / dying. NEVER remove more than one asset.
+                NEVER terminal. The player chose carefully; honor that.
+  risky       - Real cost is the DEFAULT. The player invited it.
+                Vocabulary of honest costs:
+                  * spotted             - heat rises, surprise lost,
+                                          encounter risk on next move
+                  * fled-and-caught     - captured-and-released, hours
+                                          lost, asset surrendered
+                  * shortcut-broke-leg  - condition -> wounded, distance
+                                          reverses or stalls, hours lost
+                  * ally-hurt           - sera or another NPC takes a
+                                          wound the player didn't plan
+                  * relationship-frayed - NPC's currentKnowledge gains
+                                          a fact about the player's failure
+                Terminal still off-limits.
+  desperate   - Terminal becomes legal (killed / trapped / jailed) AND
+                the upside is biggest: large distance gains, threat
+                slowdowns, asset gains, faction shifts. The player bet
+                everything; outcomes can match.
+
+Sudden severe hazards require a foreshadowing contract.
+Do not introduce a sudden severe hazard in a resolution unless one of:
+  (a) it was foreshadowed by a 'clue' or 'threat-reveal' hyperlink in a
+      recent beat, OR
+  (b) the player chose a 'desperate' option that named the unknown
+      explicitly ("alone, into the dark", "past the guards on a prayer").
+The player must always be able to look back at a planted hyperlink, or
+at the words of the choice they took, and recognize the deal they made.
+
+Knowledge mitigates; ignorance pays full cost.
+Check playerKnowledge.investigatedFacts when authoring a resolution. A
+player who learned the relevant fact and chose anyway took an informed
+gamble — they pay a real cost but rarely the worst one. A player who
+did not learn the fact and walked into the trap pays the full cost.
+
+Resolution prose for severe outcomes shows the moment, never names the
+foreshadowed thing. "The chain takes your leg" — not "a bear trap, the
+kind the cottage owner set, snaps shut". Let the player remember what
+they saw three beats ago. The synthesis is theirs.`;
+
+export const CHOICE_AUTHORING = `[CHOICE AUTHORING]
+Each choice's text signals its risk through tone, not labels:
+  controlled  - methodical, deliberate
+                ("Wait until first light", "Take the road, despite the time")
+  risky       - names the unknown
+                ("...if the road holds", "Slip past the watchman if you can")
+  desperate   - names the gamble explicitly
+                ("Alone, into the dark", "Cut the rope and pray",
+                 "Fight your way out")
+
+Default to including at least one 'controlled' option per beat. Omit the
+controlled option only when the dramatic situation truly forecloses it
+— already mid-fight, already on the run, already cornered. The player
+should usually have an out; their loss should come from declining to
+take it.
+
+The risk tag itself is internal — the UI never displays it as a colored
+badge. The player reads the gradient through choice text and prose
+framing. When you set risk='desperate', the choice text MUST contain
+language that broadcasts the gamble.`;
 
 export const HYPERLINK_INSTRUCTION = `[HYPERLINKS]
 Author 0-6 hyperlinks per beat. Tag each by linkType:
   lore           - flavor / world-color, harmless to read
   flavor         - atmospheric noun (smell, sound, glance), no consequence
-  clue           - a thread the curious player may pull
+  clue           - a thread the curious player may pull (foreshadowing!)
   threat-reveal  - clicking unlocks a known threat (use sparingly; reserve
                    for moments the player is brushing against a hidden one)
   npc-detail     - a deeper bible page on a present NPC
   investigation  - a costly action (set costHours > 0 in linkContents)
-Most links should be lore or flavor. Use clue sparingly. Reserve
-threat-reveal for genuine brushes-with-hidden-threats. Costly investigations
-should feel like deliberate effort, not casual reading.
-Every link in segments must have a matching entry in the corresponding
-linkContents map. Link ids must be unique within a beat. Per-link content
-should be 20-50 words.`;
+
+Most links should be lore or flavor. Use 'clue' meaningfully — clues are
+the mechanism by which severe outcomes become fair under the foreshadowing
+contract (see [LETHALITY & CONSEQUENCE]). When you anticipate that the
+player's next choice could go badly, plant a clue that foreshadows the
+specific danger.
+
+Clue contents must SHOW concrete details, never NAME the danger.
+  bad:  "The cottage owner sets traps in the dark woods."
+  good: "Tooled iron on the bench, coils of chain. Pelts in the corner."
+The unlocksFacts id is a machine-readable hook (e.g.,
+'traps-in-dark-woods'); the player never reads it. They read the prose
+and earn the connection — or don't, and pay for the gap.
+
+Per-link content should be 20-50 words. Every link in segments must
+have a matching entry in the corresponding linkContents map. Link ids
+must be unique within a beat. Costly investigations should feel like
+deliberate effort, not casual reading.`;
 
 export const COUNTERFACTUAL_RESTRAINT = `[COUNTERFACTUAL RESTRAINT]
 If you author scheduled events at runtime (worldImpacts.scheduledEventsToAdd):
@@ -81,20 +167,31 @@ export const ENDING_TRIGGER = `[ENDING TRIGGER]
 If distanceToKing <= 5 after applying your deltas, set
 narrativeResponse.terminalState.kind = 'reached-king' and write the
 bedside scene. The mood is shaped by runHistory (which threats completed,
-which the player stopped, which they never learned existed) - not by your
-script.
+which the player stopped, which they never learned existed) - not by
+your script.
 If clockHours - clockHoursDelta <= 0, the engine forces a 'time-up'
-ending on the next turn. If a forced-end threat completes off-screen, the
-engine emits its own ending. Do not author 'time-up', 'killed', 'trapped',
-or 'jailed' on a non-terminal beat unless the lethality budget conditions
-are met.`;
+ending on the next turn. If a forced-end threat completes off-screen,
+the engine emits its own ending. Do not author 'time-up', 'killed',
+'trapped', or 'jailed' on a non-terminal beat unless the lethality
+budget conditions are met.
+
+When you author a terminal scene, NAME THE DEAL the player made — but
+through evidence, not exposition. "You took the Dead Pines because they
+were faster. The roots remembered." "You waited for daylight, three
+times. The bells were tolling as you reached the gates." Let the player
+recognize the moment they made the choice that brought them here, or
+the run of caution that ate the clock. Imply, never announce.`;
 
 export const OUTPUT_SCHEMA_REMINDER = `[OUTPUT]
 Return a single JSON object matching the objective.model-output schema:
 worldImpacts, npcImpacts, narrativeResponse, forwardProjection,
 directorReasoning. Do not include any text outside the JSON object.
 Choices: 2-4 entries with labels A..D, each carrying a risk tag
-(controlled / risky / desperate) used by the lethality gate.`;
+(controlled / risky / desperate) used by the lethality gate.
+Use directorReasoning to note foreshadowing intent ("planting traps clue
+for likely Dead Pines route") or consistency callbacks ("honoring the
+cottage clue from beat 3"). That field is logged but not shown to the
+player.`;
 
 // ============================================================
 // System prompt assembly
@@ -103,6 +200,7 @@ Choices: 2-4 entries with labels A..D, each carrying a risk tag
 export function composeSystemPrompt(bundle) {
   const sections = [
     renderVoice(bundle),
+    PROSE_DISCIPLINE,
     renderObjective(bundle),
     renderSettingAndTone(bundle),
     renderWorldBible(bundle),
@@ -112,6 +210,7 @@ export function composeSystemPrompt(bundle) {
     NPC_INVENTION_RULES,
     KNOWLEDGE_ISOLATION_RULE,
     LETHALITY_BUDGET,
+    CHOICE_AUTHORING,
     HYPERLINK_INSTRUCTION,
     COUNTERFACTUAL_RESTRAINT,
     MACRO_THREAT_AUTHORING,

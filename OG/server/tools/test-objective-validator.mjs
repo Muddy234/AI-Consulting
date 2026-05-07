@@ -274,13 +274,79 @@ console.log('\n--- lethality gate ---');
     validateModelOutput(o, { state: controlledState, bundle }));
 }
 {
-  // non-lethal "surprise" on controlled: heavy condition change but no terminal
+  // Non-lethal surprise on controlled stays within the ceiling: condition
+  // can drop to 'tired' (or stay), at most one asset can be removed, npc
+  // moods can shift. Severe condition / multi-asset loss / terminals all
+  // require risky or desperate (covered separately by the controlled-
+  // outcome-ceiling tests below).
   const controlledState = makeState({ lastChoiceRisk: 'controlled' });
   const o = makeOutput();
-  o.worldImpacts.stateChanges.conditionChange = 'wounded';
-  o.worldImpacts.stateChanges.assetsRemoved = ['horse'];
-  assertPass('non-lethal surprise on controlled accepted',
+  o.worldImpacts.stateChanges.conditionChange = 'tired';
+  o.worldImpacts.stateChanges.assetsRemoved = ['cloak'];
+  o.npcImpacts = [{ npcId: 'sera', motivationDelta: 'wary' }];
+  assertPass('non-lethal surprise on controlled (within ceiling) accepted',
     validateModelOutput(o, { state: controlledState, bundle }));
+}
+
+// ---------- controlled-outcome ceiling ----------
+
+console.log('\n--- controlled-outcome ceiling ---');
+
+{
+  const s = makeState({ lastChoiceRisk: 'controlled' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.conditionChange = 'tired';
+  assertPass('controlled + condition=tired accepted',
+    validateModelOutput(o, { state: s, bundle }));
+}
+{
+  const s = makeState({ lastChoiceRisk: 'controlled' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.conditionChange = 'wounded';
+  assertFailAt('controlled + condition=wounded rejected',
+    validateModelOutput(o, { state: s, bundle }),
+    'worldImpacts.stateChanges.conditionChange');
+}
+{
+  const s = makeState({ lastChoiceRisk: 'controlled' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.conditionChange = 'exhausted';
+  assertFailAt('controlled + condition=exhausted rejected',
+    validateModelOutput(o, { state: s, bundle }),
+    'worldImpacts.stateChanges.conditionChange');
+}
+{
+  const s = makeState({ lastChoiceRisk: 'controlled' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.assetsRemoved = ['horse'];
+  assertPass('controlled + 1 asset removed accepted',
+    validateModelOutput(o, { state: s, bundle }));
+}
+{
+  const s = makeState({ lastChoiceRisk: 'controlled' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.assetsRemoved = ['horse', 'cloak'];
+  assertFailAt('controlled + 2 assets removed rejected',
+    validateModelOutput(o, { state: s, bundle }),
+    'worldImpacts.stateChanges.assetsRemoved');
+}
+{
+  // ceiling does NOT apply to risky
+  const s = makeState({ lastChoiceRisk: 'risky' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.conditionChange = 'wounded';
+  o.worldImpacts.stateChanges.assetsRemoved = ['horse', 'cloak'];
+  assertPass('risky + wounded + 2 assets removed accepted',
+    validateModelOutput(o, { state: s, bundle }));
+}
+{
+  // ceiling does NOT apply to desperate
+  const s = makeState({ lastChoiceRisk: 'desperate' });
+  const o = makeOutput();
+  o.worldImpacts.stateChanges.conditionChange = 'dying';
+  o.worldImpacts.stateChanges.assetsRemoved = ['a', 'b', 'c'];
+  assertPass('desperate + dying + 3 assets removed accepted',
+    validateModelOutput(o, { state: s, bundle }));
 }
 
 // ---------- terminal consistency ----------

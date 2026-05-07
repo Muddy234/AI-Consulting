@@ -155,6 +155,29 @@ function checkLethalityGate(output, state, errors) {
   }
 }
 
+// Severity ceiling for `controlled` choices. The player chose carefully;
+// honor that. Severe condition changes and multi-asset losses require
+// a `risky` or `desperate` choice. See LETHALITY_BUDGET in the prompt.
+const SEVERE_CONDITIONS = new Set(['wounded', 'exhausted', 'dying']);
+
+function checkControlledOutcomeCeiling(output, state, errors) {
+  if (state?.lastChoiceRisk !== 'controlled') return;
+  const sc = output?.worldImpacts?.stateChanges ?? {};
+
+  if (sc.conditionChange && SEVERE_CONDITIONS.has(sc.conditionChange)) {
+    errors.push({
+      path: 'worldImpacts.stateChanges.conditionChange',
+      message: `controlled choice cannot result in severe condition '${sc.conditionChange}' (allowed: healthy/tired only on controlled; severe outcomes require risky or desperate)`
+    });
+  }
+  if (Array.isArray(sc.assetsRemoved) && sc.assetsRemoved.length > 1) {
+    errors.push({
+      path: 'worldImpacts.stateChanges.assetsRemoved',
+      message: `controlled choice cannot remove more than 1 asset (${sc.assetsRemoved.length} attempted; severe outcomes require risky or desperate)`
+    });
+  }
+}
+
 function checkTerminalConsistency(output, state, errors) {
   const ts = output?.narrativeResponse?.terminalState;
   if (!ts) return;
@@ -485,6 +508,7 @@ export function validateModelOutput(output, { state, bundle }) {
     );
   }
   checkLethalityGate(output, state, errors);
+  checkControlledOutcomeCeiling(output, state, errors);
   checkTerminalConsistency(output, state, errors);
   checkScheduledEventTimes(output, state, bundle, errors);
   checkMacroThreatRules(output, state, errors);

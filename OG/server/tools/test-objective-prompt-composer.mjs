@@ -9,9 +9,11 @@ import {
   composeSystemPrompt,
   composeUserPrompt,
   composePrompt,
+  PROSE_DISCIPLINE,
   NPC_INVENTION_RULES,
   KNOWLEDGE_ISOLATION_RULE,
   LETHALITY_BUDGET,
+  CHOICE_AUTHORING,
   HYPERLINK_INSTRUCTION,
   COUNTERFACTUAL_RESTRAINT,
   MACRO_THREAT_AUTHORING,
@@ -111,6 +113,7 @@ console.log('--- system prompt: structure ---');
   const sys = composeSystemPrompt(bundle);
 
   ok('voice block present',                       contains(sys, '[VOICE]'));
+  ok('prose discipline block present',            contains(sys, '[PROSE DISCIPLINE]'));
   ok('objective block present',                   contains(sys, '[OBJECTIVE]'));
   ok('objective primary line included',           contains(sys, 'Reach the dying King Aldric'));
   ok('setting & tone block present',              contains(sys, '[SETTING & TONE]'));
@@ -118,14 +121,70 @@ console.log('--- system prompt: structure ---');
   ok('world constraints block present',           contains(sys, '[WORLD CONSTRAINTS]'));
   ok('adaptation rules block present',            contains(sys, '[ADAPTATION RULES]'));
   ok('character roster block present',            contains(sys, '[CHARACTER ROSTER]'));
+  ok('prose discipline included',                 contains(sys, PROSE_DISCIPLINE));
   ok('npc invention rules included',              contains(sys, NPC_INVENTION_RULES));
   ok('knowledge isolation rule included',         contains(sys, KNOWLEDGE_ISOLATION_RULE));
   ok('lethality budget included',                 contains(sys, LETHALITY_BUDGET));
+  ok('choice authoring included',                 contains(sys, CHOICE_AUTHORING));
   ok('hyperlink instruction included',            contains(sys, HYPERLINK_INSTRUCTION));
   ok('counterfactual restraint included',         contains(sys, COUNTERFACTUAL_RESTRAINT));
   ok('macro-threat authoring included',           contains(sys, MACRO_THREAT_AUTHORING));
   ok('ending trigger included',                   contains(sys, ENDING_TRIGGER));
   ok('output schema reminder included',           contains(sys, OUTPUT_SCHEMA_REMINDER));
+}
+
+console.log('\n--- system prompt: difficulty layering (foreshadowing + tiers + show-don\'t-tell) ---');
+{
+  const sys = composeSystemPrompt(bundle);
+  // PROSE DISCIPLINE: the show-don't-tell mantra
+  ok('prose discipline says imply, never announce',
+     contains(sys, 'Imply, never announce'));
+  ok('prose discipline applies to hyperlinks',
+     contains(sys.toLowerCase(), 'hyperlink'));
+  // LETHALITY: risk-tier ladder
+  ok('lethality has all three risk tiers',
+     contains(sys, 'controlled') && contains(sys, 'risky') && contains(sys, 'desperate'));
+  ok('lethality names the controlled ceiling explicitly',
+     contains(sys, 'NEVER push condition to wounded') ||
+     contains(sys, 'NEVER terminal'));
+  ok('lethality has the foreshadowing contract',
+     contains(sys, 'foreshadowing contract'));
+  ok('lethality has knowledge-mitigates rule',
+     contains(sys, 'Knowledge mitigates') ||
+     contains(sys, 'investigatedFacts'));
+  ok('lethality has the show-don\'t-name resolution rule',
+     contains(sys, 'never names the foreshadowed thing') ||
+     contains(sys, 'chain takes your leg'));
+  ok('lethality has named-loss vocabulary',
+     contains(sys, 'spotted') &&
+     contains(sys, 'fled-and-caught') &&
+     contains(sys, 'shortcut-broke-leg'));
+  // CHOICE AUTHORING
+  ok('choice authoring tells model to signal risk through tone',
+     contains(sys, 'signals its risk through tone'));
+  ok('choice authoring requires desperate language in choice text',
+     contains(sys, 'risk=\'desperate\'') ||
+     contains(sys, "broadcasts the gamble"));
+  ok('choice authoring defaults to one controlled per beat',
+     contains(sys, "at least one 'controlled' option"));
+  // HYPERLINK
+  ok('hyperlink shows the bad example label',
+     contains(sys, 'bad:'));
+  ok('hyperlink shows the good example label',
+     contains(sys, 'good:'));
+  ok('hyperlink mentions show concrete details',
+     contains(sys, 'SHOW concrete details'));
+  ok('hyperlink references foreshadowing contract back-reference',
+     contains(sys, 'foreshadowing contract'));
+  // ENDING
+  ok('ending tells model to name the deal',
+     contains(sys, 'NAME THE DEAL'));
+  ok('ending has imply-never-announce close',
+     contains(sys, 'Imply, never announce'));
+  // OUTPUT
+  ok('output reminder mentions directorReasoning for foreshadowing notes',
+     contains(sys, 'directorReasoning') &&
+     contains(sys, 'foreshadowing'));
 }
 
 console.log('\n--- system prompt: rev-2 removals ---');
@@ -312,7 +371,7 @@ console.log('\n--- composePrompt: returns { system, user } ---');
   const p = composePrompt(makeState(), bundle, { recentHistory, lastChoice, hudChanges, sinceHour: 30 });
   ok('has system field',  typeof p.system === 'string' && p.system.length > 100);
   ok('has user field',    typeof p.user === 'string' && p.user.length > 100);
-  ok('system has rules',  contains(p.system, '[LETHALITY]'));
+  ok('system has rules',  contains(p.system, '[LETHALITY & CONSEQUENCE]'));
   ok('user has state',    contains(p.user, '[CURRENT STATE]'));
 }
 
