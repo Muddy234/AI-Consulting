@@ -1,0 +1,420 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ember-crown.local/schemas/objective.model-output.json",
+  "title": "Objective Model Output",
+  "description": "Per-turn JSON the model must return. The validator (Phase B) layers semantic rules on top of this structural shape: lethality gate against lastChoiceRisk, server-owned-field stripping, link-id consistency between segments and linkContents, scheduled-event fireAtHour > cumulativeHoursElapsed, model-authored macro-threat cap of 2 per game, and per-world enum enforcement. See OBJECTIVE_REFACTOR_PLAN.md §1.3 + §1.4.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["worldImpacts", "npcImpacts", "narrativeResponse", "forwardProjection", "directorReasoning"],
+  "properties": {
+    "worldImpacts":       { "$ref": "#/$defs/worldImpacts" },
+    "npcImpacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/npcImpact" }
+    },
+    "narrativeResponse":  { "$ref": "#/$defs/narrativeResponse" },
+    "forwardProjection":  { "$ref": "#/$defs/forwardProjection" },
+    "directorReasoning":  { "type": "string", "description": "Free-form. Logged but not shown to the player." }
+  },
+
+  "$defs": {
+    "risk": {
+      "type": "string",
+      "enum": ["controlled", "risky", "desperate"]
+    },
+    "revelationStrength": {
+      "type": "string",
+      "enum": ["loud", "quiet", "ambient", "silent"]
+    },
+    "linkType": {
+      "type": "string",
+      "enum": ["lore", "clue", "flavor", "threat-reveal", "npc-detail", "investigation"]
+    },
+    "terminalKind": {
+      "type": "string",
+      "enum": ["reached-king", "time-up", "killed", "trapped", "jailed"]
+    },
+    "condition": {
+      "type": "string",
+      "enum": ["healthy", "tired", "wounded", "exhausted", "dying"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["certain", "suspected", "doubted"]
+    },
+    "choiceLabel": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"]
+    },
+    "forwardConfidence": {
+      "type": "string",
+      "enum": ["low", "moderate", "high"]
+    },
+
+    "worldImpacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stateChanges", "majorEventLogged"],
+      "properties": {
+        "stateChanges":    { "$ref": "#/$defs/stateChanges" },
+        "majorEventLogged":{ "type": "string", "description": "Single short sentence appended to worldState.majorEvents (rolling buffer cap 12)." },
+        "threatSlowdowns": {
+          "type": "array",
+          "description": "Optional. Player actions that pushed back named threats this turn.",
+          "items": { "$ref": "#/$defs/threatSlowdown" }
+        },
+        "scheduledEventsToAdd": {
+          "type": "array",
+          "description": "Optional. Model-authored one-shot events that will fire at fireAtHour unless preconditions cancel them.",
+          "items": { "$ref": "#/$defs/scheduledEventToAdd" }
+        },
+        "macroThreatsToAdd": {
+          "type": "array",
+          "description": "Optional. Model-authored persistent threats. Hard-capped at 2 per game by the runtime validator (this schema enforces only the per-turn shape).",
+          "items": { "$ref": "#/$defs/macroThreatToAdd" },
+          "maxItems": 2
+        }
+      }
+    },
+
+    "stateChanges": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clockHoursDelta"],
+      "properties": {
+        "clockHoursDelta": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 24,
+          "description": "Positive number of in-fiction hours this turn cost the player. Server subtracts from clockHours."
+        },
+        "distanceDelta": {
+          "type": "integer",
+          "minimum": -20,
+          "maximum": 5,
+          "description": "Engine-internal. Negative = closer to king."
+        },
+        "conditionChange": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/condition" }]
+        },
+        "assetsAdded": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "assetsRemoved": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "worldStateDeltas": {
+          "type": "object",
+          "description": "Open shape. Runtime validator strips server-owned fields (clockHours, distanceToKing, turnNumber, threats[*], scheduledEvents[*].status) and enforces per-world enums against the world bundle."
+        }
+      }
+    },
+
+    "threatSlowdown": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["threatId", "hours", "reason"],
+      "properties": {
+        "threatId": { "type": "string", "minLength": 1 },
+        "hours":    { "type": "integer", "minimum": 1 },
+        "reason":   { "type": "string", "description": "Short prose justification — 'messenger intercepted', 'rider unhorsed', etc." }
+      }
+    },
+
+    "revelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strength", "delayHours", "content"],
+      "properties": {
+        "strength":   { "$ref": "#/$defs/revelationStrength" },
+        "delayHours": { "type": "integer", "minimum": 0, "maximum": 48 },
+        "content":    { "type": "string", "description": "Prose seed for the prompt composer to weave into a future beat." }
+      }
+    },
+
+    "scheduledEventOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revelation"],
+      "properties": {
+        "worldStateDelta": { "type": "object" },
+        "npcImpacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/npcImpact" }
+        },
+        "revelation": { "$ref": "#/$defs/revelation" }
+      }
+    },
+
+    "scheduledEventToAdd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fireAtHour", "outcomeOnFire"],
+      "properties": {
+        "id":         { "type": "string", "minLength": 1 },
+        "fireAtHour": { "type": "integer", "minimum": 0, "description": "Absolute hour from start. Runtime validator enforces fireAtHour > cumulativeHoursElapsed." },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check"],
+            "additionalProperties": true,
+            "properties": { "check": { "type": "string" } }
+          }
+        },
+        "outcomeOnFire":  { "$ref": "#/$defs/scheduledEventOutcome" },
+        "outcomeOnCancel": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["revelation"],
+              "properties": {
+                "revelation": {
+                  "oneOf": [
+                    { "type": "null" },
+                    { "$ref": "#/$defs/revelation" }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["atProgress", "label"],
+      "properties": {
+        "atProgress": { "type": "integer", "minimum": 0 },
+        "label":      { "type": "string" }
+      }
+    },
+
+    "interaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger", "effect", "amount"],
+      "properties": {
+        "trigger": { "type": "string" },
+        "effect":  { "type": "string", "enum": ["slow"] },
+        "amount":  { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "macroThreatToAdd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "displayName", "duration", "phases", "onComplete"],
+      "properties": {
+        "id":          { "type": "string", "minLength": 1, "description": "Must not collide with existing threat ids — runtime validator enforces." },
+        "displayName": { "type": "string", "minLength": 1 },
+        "icon":        { "type": "string" },
+        "duration":    { "type": "integer", "minimum": 12, "maximum": 96 },
+        "phases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/phase" },
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "unlockConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": true,
+            "properties": { "type": { "type": "string" } }
+          }
+        },
+        "interactions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/interaction" }
+        },
+        "onComplete": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["majorEvent"],
+          "properties": {
+            "worldStateDelta": { "type": "object" },
+            "majorEvent":      { "type": "string" }
+          }
+        }
+      }
+    },
+
+    "npcImpact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["npcId"],
+      "properties": {
+        "npcId": { "type": "string", "minLength": 1, "description": "Must reference a character defined in the world bundle — runtime validator enforces (background NPCs go in prose only)." },
+        "locationDelta":   { "oneOf": [{ "type": "null" }, { "type": "string" }] },
+        "statusDelta":     { "oneOf": [{ "type": "null" }, { "type": "string" }] },
+        "motivationDelta": { "oneOf": [{ "type": "null" }, { "type": "string" }] },
+        "knowledgeGained": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact", "confidence"],
+            "properties": {
+              "fact":       { "type": "string" },
+              "confidence": { "$ref": "#/$defs/confidence" }
+            }
+          }
+        },
+        "offScreenAction": {
+          "oneOf": [{ "type": "null" }, { "type": "string" }]
+        }
+      }
+    },
+
+    "proseSegment": {
+      "description": "Discriminated by `type`. Text segments are plain prose; link segments produce hyperlinks rendered as ***italic + bold*** in the UI.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "content"],
+          "properties": {
+            "type":    { "const": "text" },
+            "content": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id", "content", "linkType"],
+          "properties": {
+            "type":     { "const": "link" },
+            "id":       { "type": "string", "minLength": 1, "description": "Unique within the beat. Must have a matching entry in the corresponding linkContents map — runtime validator enforces." },
+            "content":  { "type": "string", "minLength": 1, "description": "The visible link text inside the prose." },
+            "linkType": { "$ref": "#/$defs/linkType" }
+          }
+        }
+      ]
+    },
+
+    "structuredProse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["segments"],
+      "properties": {
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/proseSegment" },
+          "minItems": 1
+        }
+      }
+    },
+
+    "linkContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content"],
+      "properties": {
+        "content":     { "type": "string", "minLength": 1, "description": "20–50 words. Shown when the player clicks the link." },
+        "costHours":   { "type": "integer", "minimum": 0, "maximum": 6, "description": "In-fiction hours consumed when the player opens the link. Defaults to 0." },
+        "unlocksFacts":   { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "unlocksThreats": { "type": "array", "items": { "type": "string" }, "uniqueItems": true, "description": "Threat ids that become knownToPlayer on click. Runtime validator enforces existence in the world bundle." }
+      }
+    },
+
+    "linkContentMap": {
+      "type": "object",
+      "description": "Map of linkId -> linkContent. Capped at 6 entries per beat (matches max link count in segments). Runtime validator enforces 1-to-1 correspondence with proseSegment 'link' entries.",
+      "additionalProperties": { "$ref": "#/$defs/linkContent" },
+      "maxProperties": 6
+    },
+
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "text", "risk"],
+      "properties": {
+        "label": { "$ref": "#/$defs/choiceLabel" },
+        "text":  { "type": "string", "minLength": 1 },
+        "risk":  {
+          "$ref": "#/$defs/risk",
+          "description": "Engine-internal. Used by the lethality gate. The UI does not render this as a colored badge."
+        }
+      }
+    },
+
+    "nextBeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "intro", "introLinkContents", "choices"],
+      "properties": {
+        "title":             { "type": "string", "minLength": 1 },
+        "intro":             { "$ref": "#/$defs/structuredProse" },
+        "introLinkContents": { "$ref": "#/$defs/linkContentMap" },
+        "choices": {
+          "type": "array",
+          "items":    { "$ref": "#/$defs/choice" },
+          "minItems": 2,
+          "maxItems": 4
+        }
+      }
+    },
+
+    "narrativeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resolutionProse", "resolutionLinkContents", "isEnding", "terminalState", "nextBeat"],
+      "properties": {
+        "resolutionProse":         { "$ref": "#/$defs/structuredProse" },
+        "resolutionLinkContents":  { "$ref": "#/$defs/linkContentMap" },
+        "isEnding":                { "type": "boolean" },
+        "terminalState": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "summary"],
+              "properties": {
+                "kind":    { "$ref": "#/$defs/terminalKind" },
+                "summary": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "nextBeat": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/nextBeat" }
+          ]
+        }
+      },
+      "if":   { "properties": { "isEnding": { "const": true } } },
+      "then": {
+        "properties": {
+          "terminalState": { "type": "object" },
+          "nextBeat":      { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "terminalState": { "type": "null" },
+          "nextBeat":      { "type": "object" }
+        }
+      }
+    },
+
+    "forwardProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tonalAim", "currentConfidence"],
+      "properties": {
+        "tonalAim":          { "type": "string", "description": "Short phrase. Logged and fed back as overridable hypothesis on next turn." },
+        "currentConfidence": { "$ref": "#/$defs/forwardConfidence" }
+      }
+    }
+  }
+}

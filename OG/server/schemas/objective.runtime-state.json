@@ -1,0 +1,316 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ember-crown.local/schemas/objective.runtime-state.json",
+  "title": "Objective Runtime State",
+  "description": "Persistent per-game state for the objective-driven living-world engine. Authoritative simulation truth. See OBJECTIVE_REFACTOR_PLAN.md §1.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "gameId",
+    "worldName",
+    "turnNumber",
+    "lastAppliedLogTurn",
+    "clockHours",
+    "distanceToKing",
+    "condition",
+    "location",
+    "assets",
+    "lastChoiceRisk",
+    "worldState",
+    "threats",
+    "scheduledEvents",
+    "playerKnowledge",
+    "npcStates",
+    "runHistory",
+    "terminalState"
+  ],
+  "properties": {
+    "gameId":             { "type": "string", "minLength": 1 },
+    "worldName":          { "type": "string", "minLength": 1 },
+    "turnNumber":         { "type": "integer", "minimum": 0 },
+    "lastAppliedLogTurn": { "type": "integer", "minimum": 0 },
+
+    "clockHours":         { "type": "integer", "minimum": 0, "maximum": 96, "description": "Engine-owned. Single visible clock. Decrements as the model returns clockHoursDelta per turn." },
+    "distanceToKing":     { "type": "integer", "minimum": 0, "maximum": 100, "description": "Engine-internal. Gates the reached-king ending. Never rendered in UI." },
+
+    "condition":          { "$ref": "#/$defs/condition" },
+    "location":           { "type": "string" },
+    "assets": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 12,
+      "description": "Player assets including relationship-style entries like 'ally:sera'. Oldest dropped on overflow."
+    },
+
+    "lastChoiceRisk": {
+      "description": "Memo of the player's most recent choice's declared risk tier. Input to the lethality gate. Null on turn 1.",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/risk" }
+      ]
+    },
+
+    "worldState":         { "$ref": "#/$defs/worldState" },
+
+    "threats": {
+      "type": "object",
+      "description": "Macro-threats keyed by threat id. Always ticked, regardless of player visibility.",
+      "additionalProperties": { "$ref": "#/$defs/threatRuntimeState" }
+    },
+
+    "scheduledEvents": {
+      "type": "array",
+      "description": "One-shot pending world events. Pre-populated from world bundle; model may append at runtime.",
+      "items": { "$ref": "#/$defs/scheduledEventRuntime" }
+    },
+
+    "playerKnowledge":    { "$ref": "#/$defs/playerKnowledge" },
+
+    "npcStates": {
+      "type": "object",
+      "description": "NPC live state keyed by npcId. Knowledge-scoping mechanism from rev-1 architecture.",
+      "additionalProperties": { "$ref": "#/$defs/npcRuntimeState" }
+    },
+
+    "runHistory":         { "$ref": "#/$defs/runHistory" },
+
+    "terminalState": {
+      "description": "Set when the run has ended. Null while the game is still in play.",
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/terminalState" }
+      ]
+    }
+  },
+
+  "$defs": {
+    "condition": {
+      "type": "string",
+      "enum": ["healthy", "tired", "wounded", "exhausted", "dying"]
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["controlled", "risky", "desperate"]
+    },
+    "revelationStrength": {
+      "type": "string",
+      "enum": ["loud", "quiet", "ambient", "silent"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["certain", "suspected", "doubted"]
+    },
+    "terminalKind": {
+      "type": "string",
+      "enum": ["reached-king", "time-up", "killed", "trapped", "jailed"]
+    },
+
+    "worldState": {
+      "type": "object",
+      "description": "World-coloring fields that the model can mutate via worldStateDeltas. Per-world enums for kingStatus / crownStatus / antagonistPower / cometStage / timeOfDay are enforced by the runtime validator against the world bundle, not by this schema.",
+      "additionalProperties": false,
+      "required": ["timeOfDay", "cometStage", "kingStatus", "crownStatus", "antagonistPower", "majorEvents"],
+      "properties": {
+        "timeOfDay":       { "type": "string" },
+        "cometStage":      { "type": "string" },
+        "kingStatus":      { "type": "string" },
+        "crownStatus":     { "type": "string" },
+        "antagonistPower": { "type": "string" },
+        "majorEvents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 12,
+          "description": "Rolling buffer; oldest dropped on overflow."
+        }
+      }
+    },
+
+    "threatRuntimeState": {
+      "type": "object",
+      "description": "Per-threat live state. progress, knownToPlayer, completed, completedAt, slowedBy, revealedAtHour are all engine-owned (silently stripped if the model attempts to set them).",
+      "additionalProperties": false,
+      "required": ["progress", "currentPhase", "slowedBy", "knownToPlayer", "revealedAtHour", "completed", "completedAt", "authorSource"],
+      "properties": {
+        "progress":       { "type": "integer", "minimum": 0, "description": "Hours of accumulated progress against duration." },
+        "currentPhase":   { "type": "string", "description": "Computed from progress against the bundle threat's phases array." },
+        "slowedBy":       { "type": "integer", "minimum": 0, "description": "Accumulated player-induced slowdown (subtracted from progress for HUD effective-progress)." },
+        "knownToPlayer":  { "type": "boolean", "description": "Gates HUD render." },
+        "revealedAtHour": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0 }]
+        },
+        "completed":      { "type": "boolean" },
+        "completedAt": {
+          "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0 }]
+        },
+        "authorSource": {
+          "type": "string",
+          "enum": ["authored", "model"],
+          "description": "Whether the threat was defined in the world bundle or promoted at runtime by the model."
+        }
+      }
+    },
+
+    "precondition": {
+      "type": "object",
+      "description": "Open shape — runtime validator interprets per check type.",
+      "required": ["check"],
+      "additionalProperties": true,
+      "properties": {
+        "check": { "type": "string" }
+      }
+    },
+
+    "revelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strength", "delayHours", "content"],
+      "properties": {
+        "strength":   { "$ref": "#/$defs/revelationStrength" },
+        "delayHours": { "type": "integer", "minimum": 0, "maximum": 48 },
+        "content":    { "type": "string" }
+      }
+    },
+
+    "eventOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revelation"],
+      "properties": {
+        "worldStateDelta": { "type": "object", "description": "Open shape — runtime validator strips server-owned fields and enforces per-world enums." },
+        "npcImpacts": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "revelation": { "$ref": "#/$defs/revelation" }
+      }
+    },
+
+    "scheduledEventRuntime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fireAtHour", "preconditions", "outcomeOnFire", "outcomeOnCancel", "status", "authorSource"],
+      "properties": {
+        "id":         { "type": "string", "minLength": 1 },
+        "fireAtHour": { "type": "integer", "minimum": 0, "description": "Absolute, in-fiction hours from start of game." },
+        "preconditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/precondition" }
+        },
+        "outcomeOnFire": { "$ref": "#/$defs/eventOutcome" },
+        "outcomeOnCancel": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/eventOutcome" }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "fired", "cancelled"]
+        },
+        "authorSource": {
+          "type": "string",
+          "enum": ["authored", "model"]
+        }
+      }
+    },
+
+    "playerKnowledge": {
+      "type": "object",
+      "description": "Curated subset of worldState that has been surfaced to the player. The prompt composer reads from THIS, never directly from worldState.",
+      "additionalProperties": false,
+      "required": ["knownThreatIds", "witnessedEvents", "rumors", "investigatedFacts"],
+      "properties": {
+        "knownThreatIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Gates threat HUD rendering and prompt-composer threat block."
+        },
+        "witnessedEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["eventId", "atHour", "strength", "summary"],
+            "properties": {
+              "eventId":  { "type": "string" },
+              "atHour":   { "type": "integer", "minimum": 0 },
+              "strength": { "$ref": "#/$defs/revelationStrength" },
+              "summary":  { "type": "string" }
+            }
+          }
+        },
+        "rumors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact", "source", "atHour", "confidence"],
+            "properties": {
+              "fact":       { "type": "string" },
+              "source":     { "type": "string" },
+              "atHour":     { "type": "integer", "minimum": 0 },
+              "confidence": { "$ref": "#/$defs/confidence" }
+            }
+          }
+        },
+        "investigatedFacts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Facts unlocked via hyperlink clicks (linkContents.unlocksFacts)."
+        }
+      }
+    },
+
+    "npcRuntimeState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "status", "currentKnowledge"],
+      "properties": {
+        "location": { "type": "string" },
+        "status":   { "type": "string" },
+        "motivationDelta": {
+          "oneOf": [{ "type": "null" }, { "type": "string" }]
+        },
+        "currentKnowledge": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["fact", "confidence", "source"],
+            "properties": {
+              "fact":       { "type": "string" },
+              "confidence": { "$ref": "#/$defs/confidence" },
+              "source":     { "type": "string", "description": "Provenance: 'authored', 'Beat <n>', or 'Investigation Beat <n>'." }
+            }
+          }
+        }
+      }
+    },
+
+    "runHistory": {
+      "type": "object",
+      "description": "Run-end accumulator. Replaces hidden quadrant math from rev-1. Drives the ending-shape selection.",
+      "additionalProperties": false,
+      "required": ["threatsCompleted", "threatsStopped", "threatsNeverLearned", "counterfactualsFiredKnown", "counterfactualsFiredSilent"],
+      "properties": {
+        "threatsCompleted":           { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "threatsStopped":             { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "threatsNeverLearned":        { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "counterfactualsFiredKnown":  { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "counterfactualsFiredSilent": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    },
+
+    "terminalState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "summary"],
+      "properties": {
+        "kind":    { "$ref": "#/$defs/terminalKind" },
+        "summary": { "type": "string" }
+      }
+    }
+  }
+}
