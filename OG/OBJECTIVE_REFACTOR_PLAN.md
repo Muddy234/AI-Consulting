@@ -1,6 +1,6 @@
 # Objective Refactor — Implementation Plan (rev 2)
 
-**Status:** Revised draft, awaiting user review
+**Status:** Revised draft, decisions folded in; ready to build
 **Scope:** Ember Crown world only. Architecture must generalize to future worlds without redesign.
 **Goal:** Replace scripted-beat narrative with a living-world simulator under an objective-driven story. Single visible clock; earned-HUD threat meters; scheduled-event counterfactuals; hyperlinked prose for selective revelation.
 
@@ -20,9 +20,11 @@ Added (the world is alive whether or not you're watching):
 - Three-tier event taxonomy: macro-threat / scene-event / silent simulation
 - Authored-tentpole + engine-generated scheduled events with preconditions (for counterfactuals — good and bad)
 - Diegetic consequence revelation (delayed, indirect; player draws the causal chain)
-- Earned-HUD threat meters (only render when player has learned of the threat)
-- Hyperlinked prose with typed links (lore / clue / flavor / threat-reveal / npc-detail / investigation); some cost in-fiction time
+- Earned-HUD threat meters (only render when player has learned of the threat; slide off when slowed past 0)
+- Hyperlinked prose with typed links (lore / clue / flavor / threat-reveal / npc-detail / investigation); styled `***italic + bold***`; first-click idempotent; some cost in-fiction time
 - Threat-slowing player actions (`desperate` choices can push back antagonist progress)
+- Model-authored macro-threats at runtime (capped at 2 per game)
+- Model-authored ending screens for all terminal states, including the silent-completion irony case
 
 Retained from rev 1:
 - 96-hour primary clock
@@ -167,6 +169,20 @@ Retained from rev 1:
         },
         outcomeOnCancel: { revelation: {...} | null } | null
       }
+    ],
+
+    // Model-authored macro-threats (use sparingly — see §1.5)
+    macroThreatsToAdd: [
+      {
+        id: string,
+        displayName: string,
+        icon: string,
+        duration: int,
+        phases: [...],
+        unlockConditions: [...],
+        interactions: [...],
+        onComplete: { ... }
+      }
     ]
   },
 
@@ -234,6 +250,12 @@ Retained from rev 1:
   - `fireAtHour > cumulativeHoursElapsed` (no past-scheduling)
   - `revelation.strength` ∈ enum above
   - `revelation.delayHours ∈ [0, 48]`
+- **Model-authored macro-threats:**
+  - `id` must not collide with existing threat ids
+  - `duration ∈ [12, 96]`
+  - `phases.length ∈ [1, 5]`
+  - `authorSource` recorded as `'model'` for analytics
+  - Hard cap: **2 model-authored macro-threats per game** (prevents threat-spam; bundle threats are unlimited)
 - **Risk tag is internal.** Validator confirms its presence and enum membership but the UI layer is forbidden from styling it as a colored badge.
 
 ### 1.5 Prompt composer
@@ -265,6 +287,7 @@ Retained from rev 1:
 - **Living-world block:** lists due-revelations queued by the engine for this beat (loud/quiet/ambient) with instruction to weave them into prose at the marked strength.
 - **Hyperlink authoring instruction:** "Author 0–6 hyperlinks per beat. Tag each by linkType. Most should be `flavor` or `lore` (atmospheric, harmless). Use `clue` sparingly; reserve `threat-reveal` for when the player is brushing against a hidden threat. Costly investigations (hours > 0) should feel like deliberate effort, not casual reading."
 - **Counterfactual restraint:** "If you author scheduled events at runtime, default revelation strength is `quiet`, default delay is 12–24 hours. Reserve `loud` for events the player will likely encounter directly. Reserve `silent` for cancelled outcomes (the saved-without-knowing case)."
+- **Macro-threat authoring (use sparingly):** "You may promote a major emergent situation into a persistent threat via `macroThreatsToAdd` — a faction whose plan you've just exposed; an ally turned hunter; a betrayal whose consequences will tick across many beats. Reserve this for genuine mid-run pivots, not re-skins of existing threats. Capped at 2 per game; the validator will reject a third."
 - **Ending trigger:** "If `distanceToKing ≤ 5` after applying your deltas, set `terminalState.kind = 'reached-king'`. The mood of the bedside scene is shaped by `runHistory` (which threats you completed/stopped/never-learned), not by your script."
 
 ---
@@ -384,8 +407,8 @@ Tentpole event count for Ember Crown v1: **5–8 authored scheduled events** (ki
    - Process due revelations: any with `revealAtHour ≤ cumulativeHoursElapsed` are moved into `playerKnowledge.witnessedEvents` and flagged for the prompt composer to weave into next prose.
 
 3. **Check forced terminals before model call:**
-   - `clockHours ≤ 0` → emit `time-up` ending; skip model
-   - Any threat with `id === 'halric-coronation'` completed → emit `time-up`-flavored ending (Halric crowned)
+   - `clockHours ≤ 0` → emit `time-up` ending; skip standard model call (ending screen still uses a separate model call — see §4.4)
+   - Any threat with a forced-end `onComplete` (e.g., `halric-coronation`) completed → emit forced-end. Fires regardless of whether the threat was `knownToPlayer` — the ironic ending is part of the design (see §4.4).
 
 4. **Compose prompt** from `playerKnowledge` and lean state block (see §1.5). Include due-revelations.
 
@@ -397,14 +420,16 @@ Tentpole event count for Ember Crown v1: **5–8 authored scheduled events** (ki
 
 8. **Process model-authored `scheduledEventsToAdd`:** validate, add to `scheduledEvents[]` with `authorSource: 'model'`.
 
-9. **Process `threatSlowdowns`:** apply to corresponding threats' `slowedBy`.
+9. **Process model-authored `macroThreatsToAdd`:** validate (cap of 2 per game enforced), add to `threats{}` with `authorSource: 'model'`, `progress: 0`, `knownToPlayer: false`. Unlock conditions evaluate on next turn like any threat.
 
-10. **Check terminal predicates after model deltas:**
+10. **Process `threatSlowdowns`:** apply to corresponding threats' `slowedBy`. If a known threat's `effectiveProgress = max(0, progress - slowedBy)` drops to 0, mark for HUD removal in this turn's response. The threat object stays in state with `knownToPlayer: true`; if later progress exceeds `slowedBy` again, the meter reappears and the prompt composer flags this as a beat-level event the model may acknowledge in prose.
+
+11. **Check terminal predicates after model deltas:**
     - `distanceToKing ≤ 5` AND `terminalState.kind === 'reached-king'` → ending
     - `terminalState.kind ∈ {killed, trapped, jailed}` AND `lastChoiceRisk === 'desperate'` → terminal
     - Otherwise continue
 
-11. **Persist + emit `final`.**
+12. **Persist + emit `final`.**
 
 ### 3.3 New / changed endpoints
 
@@ -420,15 +445,16 @@ Tentpole event count for Ember Crown v1: **5–8 authored scheduled events** (ki
 ### 4.1 Side panel — minimal HUD
 - **Clock face:** hours remaining; color shifts amber below 36h, red below 12h. No exact number under 12h — switches to qualitative ("a handful of hours left").
 - **Condition badge:** text chip with status color
-- **Threat meters (0–2 visible):** only render where `playerKnowledge.knownThreatIds` includes the threat. Display: icon + displayName + qualitative phase label ("Brewing" / "Moving" / "Imminent"). **No numbers, no fill bar percentage.** Optional fill style is purely visual gradient. If more than 2 threats are known, show the 2 most progressed; the rest collapse into a "..." chip with hover-detail.
+- **Threat meters (0–2 visible):** only render where `playerKnowledge.knownThreatIds` includes the threat AND `effectiveProgress > 0`. Display: icon + displayName + qualitative phase label ("Brewing" / "Moving" / "Imminent"). **No numbers, no fill bar percentage.** Optional fill style is purely visual gradient. If more than 2 threats are known, show the 2 most progressed; the rest collapse into a "..." chip with hover-detail.
+- **Threat meter removal on slowdown:** when a known threat's `effectiveProgress` drops to 0 (player action pushed it back), the meter slides off-HUD with a brief acknowledgment. The threat is *not* forgotten — `knownToPlayer` stays true. If new progress later exceeds `slowedBy`, the meter slides back in and the prose for that beat acknowledges the resurgence.
 
 Removed widgets (live in prose only): distance, heat, moves, assets list.
 
 ### 4.2 Prose rendering
-- Render `segments[]` inline. `text` segments are plain. `link` segments use **subtle dotted underline + soft accent color** (not button-styled).
+- Render `segments[]` inline. `text` segments are plain. **`link` segments are styled `***italic + bold***`** — typographically distinct enough that the affordance teaches itself; no onboarding hint required. All link types share this single style; the engine cares about `linkType`, the player does not.
 - Click opens a small popup or right-rail slide-in showing `linkContents[linkId].content`.
 - If `costHours > 0`, popup shows a confirmation gate: "Investigate? (costs ~Nh)" before consuming the time.
-- Once a link is opened, its style shifts to "read" state (still legible, less prominent).
+- **Idempotent per linkId per beat (first-click only):** once opened, a link's style shifts to a muted "already read" state. Re-clicking shows the same content with no further `costHours` charge and no additional unlocks.
 - Hyperlinks survive across re-renders within the same beat; cleared at next beat.
 
 ### 4.3 Choice rendering (changed)
@@ -437,9 +463,17 @@ Removed widgets (live in prose only): distance, heat, moves, assets list.
 - The model is responsible for conveying weight through prose tone alone.
 
 ### 4.4 Terminal screens
-- **`reached-king`** — bedside scene. Ending shape selected by `runHistory`: which threats completed (loud failures), which the player stopped (quiet wins), which they never learned existed (ambient irony). Model authors the scene; engine passes the runHistory summary as input.
-- **`time-up`** — Halric crowns his puppet. The era ends without you.
-- **`killed` / `trapped` / `jailed`** — cutscene + "Begin Again."
+
+All terminal screens are **model-authored** with `runHistory` and the relevant trigger payload as input. The engine never ships canned ending prose — every ending is contextualized to the run that produced it.
+
+- **`reached-king`** — bedside scene. Engine passes `runHistory` (threats completed / stopped / never-learned) and lets the model select among 4 templated shapes:
+  - *Clean victory:* most threats stopped; king lives; world largely intact
+  - *Costly victory:* king lives but world is permanently changed (ally lost, faction broken)
+  - *Pyrrhic:* king lives but at cost the player will carry forward
+  - *Ambient irony:* the player saved things they never knew were threatened — the threats they never learned about ripple through the closing prose as discovered-too-late truths
+- **`time-up` (clock expiry):** model authors a 100–200-word closing scene. Engine passes elapsed-clock context and any in-progress threats; the prose lands with whatever weight the player's known/unknown state warrants.
+- **`time-up` (forced by silent threat completion):** when a forced-end threat completes regardless of player knowledge, this is its own dramatic shape. Engine passes the threat's `onComplete.majorEvent`, plus a flag indicating whether the player ever learned of the threat. If they did, the ending lands as expected dread realized. **If they never knew** (the `ambient-irony` failure case — the player wandered while Halric crowned his puppet), the model writes the discovery in the closing scene: the player arrives at Vael's Reach to find black banners and learns the name they never knew. This is the inverse of the `ambient-irony` victory; both are first-class endings, not edge cases.
+- **`killed` / `trapped` / `jailed`** — cutscene authored from `lastChoiceRisk: 'desperate'` context + `runHistory`. "Begin Again" button.
 
 ---
 
@@ -487,24 +521,31 @@ Removed widgets (live in prose only): distance, heat, moves, assets list.
 
 ---
 
-## 7. Open Questions for User Review
+## 7. Resolved Decisions
 
-1. **Tentpole authored events for Ember Crown v1.** Plan currently calls for 5–8. Need a list. *Recommendation: king's decline at 24h/48h/72h; Halric phase-shifts at 40h/75h; comet zenith at 60h. ~6 total.*
-2. **Default revelation strength for cancelled counterfactuals.** Strong tone-shaping decision. *Recommendation: 70% `quiet` (delayed indirect evidence), 30% `silent` (player never learns). Most ripples surface; some are kindnesses the world keeps.*
-3. **Hyperlink budget per beat.** 0–6 links per beat at 20–50 words each = up to ~300 extra output tokens per beat. Acceptable? *Recommendation: yes, cap at 6 per beat in validator; flag for cost review at Phase K.*
-4. **Player investigation as explicit verb.** "Ask Sera about Halric" — is this a hyperlink on her name with `costHours > 0`, or a separate mechanism? *Recommendation: the hyperlink path. Keeps one mechanism for all player-driven curiosity.*
-5. **Macro-threat authorship — model or world bundle only?** Can the model promote a runtime situation into a new persistent threat with a meter? *Recommendation: v1 = bundle-only. Model can schedule short-horizon events freely; promotion to macro-threat is authoring-only. Revisit in v2.*
-6. **Investigation time-cost balance.** What share of the 96-hour budget should a curious player spend on hyperlink investigation? *Recommendation: aim for ~10% (≈10h) in playtest; tune at Phase K.*
-7. **Collapsed-threat HUD overflow.** When >2 threats are known, should the overflow chip show count only, or summary? *Recommendation: count + hover-detail; do not enlarge the visible HUD.*
-8. **Ending shapes from `runHistory`.** How many distinct bedside-scene templates? *Recommendation: 4 — clean victory (most threats stopped); costly victory (king lives but world is changed); pyrrhic (king lives, ally lost or world fractured); ambient irony (you saved things you never knew were threatened).*
-9. **Re-prompt budget on validation fail.** Keep at 1? *Recommendation: yes.*
-10. **Choice count distribution.** Free 2–4, or default 3 with model permitted to drop to 2 in tight scenes? *Recommendation: free 2–4; trust the model.*
+All design questions from review are resolved and folded into the spec above. Summary for traceability:
+
+1. **Tentpole authored events for Ember Crown v1:** ~6 events — king's decline at 24h / 48h / 72h; Halric phase-shifts at 40h / 75h; comet zenith at 60h.
+2. **Cancelled-counterfactual revelation default:** 70% `quiet` (delayed indirect evidence); 30% `silent` (player never learns). Most ripples surface; some are kindnesses the world keeps.
+3. **Hyperlink budget per beat:** capped at 6; per-link content ≤ 50 words. Token cost monitored at Phase K.
+4. **Player investigation mechanism:** unified through hyperlinks with `costHours > 0`. No separate "ask" verb.
+5. **Macro-threat authorship — flexible.** Both bundle-authored and model-authored macro-threats are permitted. Model-authored capped at 2 per game (see §1.4).
+6. **Investigation time-cost share:** target ~10% of the 96h budget (≈10h) for a curious-player run; tune at Phase K.
+7. **HUD overflow when >2 known threats:** show the 2 most progressed; collapse the rest into a "..." chip with hover-detail. HUD does not grow.
+8. **Ending shapes from `runHistory`:** 4 templated shapes for `reached-king` (clean / costly / pyrrhic / ambient-irony); plus distinct `time-up` shapes for clock-expiry and silent-threat-completion (see §4.4).
+9. **Re-prompt budget on validation fail:** 1 retry.
+10. **Choice count distribution:** free 2–4; trust the model.
+11. **Hyperlink convention onboarding:** none. The `***italic + bold***` typographical differential carries the affordance — see §4.2.
+12. **Hyperlink idempotency:** first-click only per `linkId` per beat. Re-clicking shows the cached content with no additional `costHours` and no additional unlocks.
+13. **Threat slowed past 0:** `effectiveProgress = max(0, progress - slowedBy)`. When a known threat's effective progress hits 0, the HUD meter is removed; the threat object remains in state with `knownToPlayer: true`. If new progress later exceeds `slowedBy`, the meter slides back in and the model is flagged to acknowledge the resurgence in prose.
+14. **Off-screen threat completion forcing the ending:** completion fires regardless of player knowledge. The ending screen is model-authored from `runHistory` plus a flag for whether the player ever learned of the threat. The ironic case (silent completion → player discovers it only at the end) is a first-class ending shape, not an edge case.
+15. **Hyperlinks in the openingScene:** yes — opening prose carries hyperlinks authored in the world bundle. xlsx authoring template gains a links sheet (see §2).
 
 ---
 
 ## 8. Out of Scope (v2+)
 
-- Player-authored macro-threats (model can schedule short events; cannot promote to threat)
+- Player-directly-authored content (the player makes choices; only the bundle and the model produce threats, scheduled events, and prose)
 - Map / location-graph navigation
 - Skill stats / dream-charge meta-resource
 - Inventory verbs as conditional choices
@@ -534,15 +575,19 @@ Removed widgets (live in prose only): distance, heat, moves, assets list.
 
 ---
 
-## 10. Approval Checklist
+## 10. Build Status
 
-- [ ] §1.1 player-facing premise acceptable (drop `moves-up` ending; minimal HUD)
-- [ ] §1.2 runtime state shape acceptable (worldState vs playerKnowledge separation; threats/scheduledEvents shapes)
-- [ ] §1.3 model output contract acceptable (structured prose, link contents, scheduled events, threat slowdowns)
-- [ ] §1.4 validator rules acceptable (lethality gate scope; hyperlink schema; server-owned strip)
-- [ ] §1.5 prompt composer acceptable (knowledge-layer read; revelation injection; hyperlink + counterfactual instructions)
-- [ ] §2 world bundle migration acceptable (threats, authoredScheduledEvents, openingScene with hyperlinks)
-- [ ] §3 server flow acceptable (world tick; revelation queue; `/investigate` endpoint)
-- [ ] §4 browser UI acceptable (minimal HUD; subtle hyperlinks; no risk badges/stake/cost)
-- [ ] §6 phased rollout order acceptable
-- [ ] §7 open questions answered
+Design approved. All 15 review questions resolved (§7). Ready to begin Phase A.
+
+- [x] §1.1 player-facing premise (drop `moves-up`; minimal HUD)
+- [x] §1.2 runtime state shape (`worldState` vs `playerKnowledge`; `threats` / `scheduledEvents`)
+- [x] §1.3 model output contract (structured prose, link contents, scheduled events, threat slowdowns, model-authored macro-threats)
+- [x] §1.4 validator rules (lethality gate scope; hyperlink schema; macro-threat caps; server-owned strip)
+- [x] §1.5 prompt composer (knowledge-layer read; revelation injection; hyperlink, counterfactual, and macro-threat authoring instructions)
+- [x] §2 world bundle migration (threats, authoredScheduledEvents, openingScene with hyperlinks)
+- [x] §3 server flow (world tick; revelation queue; macro-threat ingestion; threat-meter slide; `/investigate` endpoint)
+- [x] §4 browser UI (minimal HUD; italic-bold hyperlinks; first-click idempotency; model-authored ending screens)
+- [x] §6 phased rollout order
+- [x] §7 design questions resolved
+
+**Next deliverable:** Phase A — schema spec files at `server/schemas/objective.{model-output,runtime-state}.json`.
