@@ -17,21 +17,22 @@
   --ember-bright: #c95a1f;
   --ember-deep: #6b2818;
   --blood: #8b2e1f;
-  --panel-bg: #060a14;
-  --panel-border: #2a3447;
-  --panel-text: #c4d4ee;
-  --panel-text-bright: #e8eef9;
-  --panel-accent: #7fc8e0;
-  --canonical: #6ed0a3;
-  --divergent: #e8916d;
-  --error: #ff6b5b;
+  --hud-bg: #060a14;
+  --hud-border: #2a3447;
+  --hud-text: #c4d4ee;
+  --hud-bright: #e8eef9;
+  --hud-accent: #7fc8e0;
+  --hud-warn: #e8c479;
+  --hud-danger: #e8916d;
+  --link-color: #6b2818;
+  --link-bg-hover: #f3e9c9;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--page-bg); }
 body {
   color: var(--ink);
   font-family: 'Spectral', Georgia, serif;
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.65;
   min-height: 100vh;
   overflow-x: hidden;
@@ -39,890 +40,761 @@ body {
 }
 body::before {
   content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(ellipse at top right, rgba(168, 69, 26, 0.05) 0%, transparent 50%), radial-gradient(ellipse at bottom left, rgba(107, 40, 24, 0.06) 0%, transparent 55%);
-  pointer-events: none;
-  z-index: 0;
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at top, rgba(168, 69, 26, 0.04), transparent 60%),
+    radial-gradient(ellipse at bottom, rgba(107, 40, 24, 0.04), transparent 60%);
+  pointer-events: none; z-index: 0;
 }
-.app { position: relative; z-index: 2; min-height: 100vh; display: grid; grid-template-columns: 1fr 360px; }
-.story-side { padding: 56px 64px 96px; max-width: 820px; margin: 0 auto; width: 100%; }
-.story-header {
-  border-bottom: 1px solid rgba(107, 40, 24, 0.25);
-  padding-bottom: 28px;
-  margin-bottom: 48px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24px;
+
+/* ---------- layout ---------- */
+.app {
+  position: relative; z-index: 1;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 36px 28px 80px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
 }
-.title-block .eyebrow {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.35em;
-  text-transform: uppercase;
-  color: var(--ember-glow);
-  margin-bottom: 14px;
-  font-weight: 600;
+.title-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  border-bottom: 1px solid rgba(42, 24, 16, 0.2);
+  padding-bottom: 14px;
 }
-.title-block h1 {
+.title-row h1 {
   font-family: 'Cinzel', serif;
-  font-size: 46px;
+  font-weight: 600;
+  font-size: 28px;
+  color: var(--ink-heading);
+  letter-spacing: 0.04em;
+}
+.title-row .subtitle {
+  font-style: italic;
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+/* ---------- HUD ---------- */
+.hud {
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  padding: 14px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.hud-clock {
+  display: flex; flex-direction: column; gap: 2px; min-width: 110px;
+}
+.hud-label {
+  font-size: 10px; color: var(--hud-text); opacity: 0.6;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.hud-clock-value {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--hud-bright);
+}
+.hud-clock-value.warn   { color: var(--hud-warn); }
+.hud-clock-value.danger { color: var(--hud-danger); }
+.hud-clock-value.qual   { font-style: italic; font-size: 16px; font-weight: 500; }
+
+.hud-condition .chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  background: rgba(127, 200, 224, 0.12);
+  border: 1px solid var(--hud-accent);
+  color: var(--hud-bright);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--ink-heading);
-  line-height: 1;
+  text-transform: capitalize;
 }
-.act-indicator { font-family: 'JetBrains Mono', monospace; text-align: right; flex-shrink: 0; }
-.act-indicator .act-label { font-size: 22px; color: var(--ember-glow); font-weight: 600; line-height: 1.1; }
-.act-indicator .act-sub { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.2em; text-transform: uppercase; margin-top: 6px; font-weight: 600; }
-.narrative { font-size: 19px; line-height: 1.8; color: var(--ink); font-weight: 400; }
-.narrative p { margin-bottom: 1.1em; }
-.narrative.first p:first-child::first-letter {
-  font-family: 'Cinzel', serif;
-  font-size: 4.2em;
-  float: left;
-  line-height: 0.85;
-  margin-right: 0.12em;
-  margin-top: 0.05em;
-  color: var(--ember-glow);
-  font-weight: 700;
-}
-.choices { display: flex; flex-direction: column; gap: 14px; margin-top: 40px; }
-.choice {
-  background: rgba(255, 248, 225, 0.55);
-  border: 1px solid rgba(107, 40, 24, 0.3);
-  color: var(--ink);
-  font-family: 'Spectral', serif;
-  font-size: 16.5px;
-  text-align: left;
-  padding: 20px 26px;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  line-height: 1.5;
-  font-weight: 400;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-.choice:hover:not(:disabled) {
-  background: rgba(255, 248, 225, 0.95);
-  border-color: var(--ember-glow);
-  transform: translateX(6px);
-  box-shadow: 0 4px 14px rgba(107, 40, 24, 0.15);
-}
-.choice:hover:not(:disabled) .marker { color: var(--ember-bright); }
-.choice .marker {
-  font-family: 'Cinzel', serif;
-  font-weight: 700;
-  color: var(--ember-glow);
-  margin-right: 14px;
-  letter-spacing: 0.08em;
-  transition: color 0.2s ease;
-  flex-shrink: 0;
-}
-.choice .text { flex: 1; }
-.choice .tag {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
-  margin-top: 3px;
-  opacity: 0.7;
-}
-.choice .tag.coord       { color: #4a3a2a; background: rgba(168, 132, 96, 0.18); }
-.choice .tag.coord-claim    { color: #7a3520; background: rgba(232, 145, 109, 0.20); }
-.choice .tag.coord-withdraw { color: #4a4a6b; background: rgba(140, 152, 200, 0.18); }
-.choice .tag.coord-champion { color: #2f6b4f; background: rgba(110, 208, 163, 0.18); }
-.choice .tag.coord-witness  { color: #6b4a8a; background: rgba(180, 152, 220, 0.18); }
-.choice:disabled { opacity: 0.5; cursor: wait; }
+.hud-condition .chip.wounded   { background: rgba(232, 145, 109, 0.15); border-color: var(--hud-danger); color: var(--hud-danger); }
+.hud-condition .chip.exhausted { background: rgba(232, 196, 121, 0.15); border-color: var(--hud-warn); color: var(--hud-warn); }
+.hud-condition .chip.dying     { background: rgba(232, 145, 109, 0.25); border-color: var(--hud-danger); color: #ffd8c8; }
 
-/* Loading state */
-.loading {
-  margin: 48px 0;
-  padding: 32px;
-  text-align: center;
-  border: 1px dashed rgba(107, 40, 24, 0.35);
-  background: rgba(255, 248, 225, 0.3);
+.hud-threats { display: flex; gap: 10px; flex-wrap: wrap; }
+.threat-chip {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  background: rgba(168, 69, 26, 0.18);
+  border: 1px solid var(--ember-glow);
+  font-size: 11px;
 }
-.loading-text {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--ember-deep);
-  font-weight: 600;
-  margin-bottom: 14px;
-}
-.loading-shimmer {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--ember-glow);
-  animation: shimmer 1.4s ease-in-out infinite;
-}
-.loading-shimmer:nth-child(2) { animation-delay: 0.2s; margin: 0 8px; }
-.loading-shimmer:nth-child(3) { animation-delay: 0.4s; }
-@keyframes shimmer {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
-  40% { opacity: 1; transform: scale(1); }
-}
-.loading-meta {
-  font-family: 'Spectral', serif;
-  font-style: italic;
-  font-size: 14px;
-  color: var(--ink-dim);
-  margin-top: 16px;
-}
+.threat-chip .name { color: var(--hud-bright); font-weight: 600; letter-spacing: 0.04em; }
+.threat-chip .phase { color: #ffb892; font-style: italic; }
+.threat-chip.imminent { background: rgba(139, 46, 31, 0.4); border-color: var(--hud-danger); }
 
-/* Error */
-.error-box {
-  margin: 32px 0;
-  padding: 20px;
-  border: 1px solid var(--error);
-  background: rgba(255, 107, 91, 0.08);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  color: var(--ink);
-  line-height: 1.6;
-}
-.error-box strong { color: var(--error); display: block; margin-bottom: 8px; letter-spacing: 0.15em; }
-.error-box pre { white-space: pre-wrap; word-break: break-word; margin-top: 10px; font-size: 11px; opacity: 0.85; max-height: 240px; overflow-y: auto; background: rgba(0,0,0,0.04); padding: 10px; }
-.retry-btn {
-  margin-top: 14px;
+.hud-actions { margin-left: auto; }
+.hud-actions button {
   background: transparent;
-  border: 1px solid var(--ember-deep);
-  color: var(--ember-deep);
-  padding: 8px 20px;
-  font-family: 'Cinzel', serif;
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  font-weight: 600;
+  border: 1px solid var(--hud-border);
+  color: var(--hud-text);
+  padding: 4px 12px;
+  font-family: inherit; font-size: 11px;
+  border-radius: 3px;
   cursor: pointer;
-}
-.retry-btn:hover { background: var(--ember-deep); color: #fdf4dc; }
-
-/* Ending */
-.ending-card {
-  border: 2px solid var(--ember-deep);
-  background: linear-gradient(145deg, rgba(255, 244, 218, 0.85), rgba(235, 220, 185, 0.95));
-  padding: 40px 36px;
-  margin-top: 16px;
-  position: relative;
-  box-shadow: 0 8px 32px rgba(107, 40, 24, 0.15);
-}
-.ending-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at top right, rgba(168, 69, 26, 0.08), transparent 60%);
-  pointer-events: none;
-}
-.ending-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.35em;
-  color: var(--ember-deep);
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  margin-bottom: 20px;
-  font-weight: 600;
-  position: relative;
 }
-.ending-body { color: var(--ink); font-size: 18px; line-height: 1.78; font-weight: 400; position: relative; }
-.ending-body p { margin-bottom: 1em; }
-.restart-wrap { text-align: center; margin-top: 56px; }
-.restart {
-  background: transparent;
-  border: 1px solid var(--ember-deep);
-  color: var(--ember-deep);
+.hud-actions button:hover { background: rgba(196, 212, 238, 0.06); color: var(--hud-bright); }
+
+/* ---------- prose ---------- */
+.prose-area {
+  display: flex; flex-direction: column; gap: 24px;
+}
+.prose-block {
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+.prose-block p { margin-bottom: 16px; }
+.prose-block .resolution-label {
   font-family: 'Cinzel', serif;
-  padding: 14px 32px;
-  letter-spacing: 0.25em;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: all 0.25s ease;
-}
-.restart:hover { background: var(--ember-deep); color: #fdf4dc; }
-
-/* Side panel */
-.side {
-  background: var(--panel-bg);
-  border-left: 1px solid var(--panel-border);
-  padding: 36px 28px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12.5px;
-  color: var(--panel-text);
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-}
-.side::-webkit-scrollbar { width: 4px; }
-.side::-webkit-scrollbar-track { background: var(--panel-bg); }
-.side::-webkit-scrollbar-thumb { background: var(--panel-border); }
-.side-header { border-bottom: 1px solid var(--panel-border); padding-bottom: 20px; margin-bottom: 24px; }
-.side-eyebrow {
-  font-size: 10px;
-  letter-spacing: 0.35em;
-  color: var(--panel-accent);
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.side-eyebrow::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: var(--panel-accent);
-  border-radius: 50%;
-  box-shadow: 0 0 8px var(--panel-accent);
-  animation: pulse 2s ease infinite;
-}
-.side-eyebrow.thinking::before {
-  background: var(--divergent);
-  box-shadow: 0 0 12px var(--divergent);
-  animation: pulse 0.7s ease infinite;
-}
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.side-title { font-size: 17px; color: var(--panel-text-bright); margin-top: 10px; font-weight: 600; letter-spacing: 0.02em; }
-.side-status { font-size: 10px; color: var(--panel-text); opacity: 0.7; margin-top: 4px; letter-spacing: 0.2em; text-transform: uppercase; }
-.side-status.thinking { color: var(--divergent); opacity: 1; }
-.side-section { margin-bottom: 22px; }
-.side-label {
-  font-size: 9px;
-  letter-spacing: 0.3em;
-  color: var(--panel-accent);
-  text-transform: uppercase;
-  margin-bottom: 8px;
-  display: block;
-  font-weight: 600;
-}
-.side-content { color: var(--panel-text); font-size: 12.5px; line-height: 1.65; }
-.side-content.bright { color: var(--panel-text-bright); }
-.objective {
-  background: rgba(127, 200, 224, 0.06);
-  border: 1px solid rgba(127, 200, 224, 0.2);
-  padding: 12px 14px;
-  margin-bottom: 24px;
-  color: var(--panel-text-bright);
-  line-height: 1.6;
-}
-.log-entry {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px dashed rgba(42, 52, 71, 0.6);
-  font-size: 11px;
-  align-items: start;
-}
-.log-entry:last-child { border-bottom: none; }
-.log-choice { font-weight: 700; text-align: center; color: var(--canonical); padding-top: 1px; }
-.log-text { color: var(--panel-text); line-height: 1.45; }
-.log-beat { color: var(--panel-accent); font-size: 10px; letter-spacing: 0.05em; display: block; margin-bottom: 2px; }
-.health-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-.health-dot { width: 7px; height: 7px; border-radius: 50%; background: #555; }
-.health-dot.ok { background: var(--canonical); box-shadow: 0 0 6px var(--canonical); }
-.health-dot.bad { background: var(--error); box-shadow: 0 0 6px var(--error); }
-
-/* Dev-mode public state */
-.dev-banner {
-  font-size: 8px;
-  letter-spacing: 0.3em;
-  color: var(--divergent);
-  text-transform: uppercase;
+  text-transform: uppercase; letter-spacing: 0.15em;
+  font-size: 11px; color: var(--ember-deep);
   margin-bottom: 6px;
+}
+.prose-divider {
+  height: 1px; background: rgba(42, 24, 16, 0.15);
+  margin: 8px 0;
+}
+.beat-title {
+  font-family: 'Cinzel', serif;
   font-weight: 600;
-  opacity: 0.85;
+  font-size: 19px;
+  color: var(--ember-deep);
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
 }
-.kv-row {
-  display: grid;
-  grid-template-columns: 88px 1fr;
-  gap: 8px;
-  padding: 3px 0;
-  font-size: 11px;
-  line-height: 1.5;
-  border-bottom: 1px dotted rgba(42, 52, 71, 0.4);
-}
-.kv-row:last-child { border-bottom: none; }
-.kv-key { color: var(--panel-accent); letter-spacing: 0.08em; text-transform: uppercase; font-size: 9px; padding-top: 2px; }
-.kv-val { color: var(--panel-text-bright); word-break: break-word; }
-.npc-row {
-  padding: 6px 0;
-  font-size: 11px;
-  line-height: 1.45;
-  border-bottom: 1px dotted rgba(42, 52, 71, 0.4);
-}
-.npc-row:last-child { border-bottom: none; }
-.npc-name { color: var(--panel-text-bright); font-weight: 600; }
-.npc-role { color: var(--panel-accent); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; margin-left: 6px; }
-.npc-meta { color: var(--panel-text); opacity: 0.8; font-size: 10px; margin-top: 2px; }
-.event-row {
-  padding: 4px 0;
-  font-size: 10.5px;
-  line-height: 1.5;
-  color: var(--panel-text);
-  border-bottom: 1px dotted rgba(42, 52, 71, 0.4);
-}
-.event-row:last-child { border-bottom: none; }
-.empty-hint { color: var(--panel-text); opacity: 0.4; font-style: italic; font-size: 11px; }
 
-@media (max-width: 1000px) {
-  .app { grid-template-columns: 1fr; }
-  .story-side { padding: 36px 22px 64px; }
-  .story-header { flex-wrap: wrap; gap: 16px; padding-bottom: 22px; margin-bottom: 32px; }
-  .title-block h1 { font-size: 32px; }
-  .narrative { font-size: 17px; }
-  .side { position: static; height: auto; border-left: none; border-top: 1px solid var(--panel-border); padding: 28px 22px 40px; }
-  .ending-body { font-size: 16px; }
+/* hyperlinks: italic + bold typographically distinct (per Phase F/G design) */
+.prose-block a.hyperlink {
+  font-style: italic;
+  font-weight: 700;
+  color: var(--link-color);
+  text-decoration: none;
+  cursor: pointer;
+  border-bottom: 1px dotted rgba(107, 40, 24, 0.4);
+  padding: 0 1px;
+  transition: background 0.12s;
 }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.fade-in { animation: fadeIn 0.6s ease forwards; }
-@keyframes glowIn { from { opacity: 0; } to { opacity: 1; } }
-.glow-in { animation: glowIn 0.8s ease forwards; }
+.prose-block a.hyperlink:hover { background: var(--link-bg-hover); }
+.prose-block a.hyperlink.read {
+  color: var(--ink-dim);
+  border-bottom-style: dotted;
+  font-weight: 500;
+}
+
+/* ---------- choices ---------- */
+.choices { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.choice-button {
+  background: transparent;
+  border: 1px solid rgba(42, 24, 16, 0.25);
+  border-left: 3px solid var(--ember-glow);
+  font-family: 'Spectral', serif;
+  font-size: 16px;
+  color: var(--ink);
+  padding: 14px 20px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+.choice-button:hover {
+  background: var(--link-bg-hover);
+  border-left-color: var(--ember-bright);
+}
+.choice-button .label {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  margin-right: 12px;
+  color: var(--ember-deep);
+}
+.choice-button:disabled { opacity: 0.5; cursor: wait; }
+
+/* ---------- terminal screen ---------- */
+.terminal {
+  text-align: center;
+  padding: 28px 20px;
+  background: rgba(107, 40, 24, 0.06);
+  border: 1px solid rgba(107, 40, 24, 0.25);
+  border-radius: 4px;
+}
+.terminal h2 {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 22px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ember-deep);
+  margin-bottom: 16px;
+}
+.terminal-summary { font-style: italic; font-size: 17px; line-height: 1.7; }
+.terminal-actions { margin-top: 24px; }
+.terminal-actions button {
+  font-family: 'Cinzel', serif; font-weight: 600;
+  background: var(--ember-deep); color: #f4ead0;
+  padding: 10px 28px; font-size: 13px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  border: none; border-radius: 2px; cursor: pointer;
+}
+.terminal-actions button:hover { background: var(--ember-bright); }
+
+/* ---------- link popup (overlay) ---------- */
+.popup-bg {
+  position: fixed; inset: 0;
+  background: rgba(26, 12, 6, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50; padding: 24px;
+}
+.popup {
+  background: var(--page-bg);
+  border: 1px solid rgba(42, 24, 16, 0.4);
+  border-radius: 4px;
+  max-width: 480px;
+  width: 100%;
+  padding: 22px 26px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+.popup-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ember-deep);
+  margin-bottom: 12px;
+}
+.popup-body { font-size: 16px; line-height: 1.65; }
+.popup-cost {
+  margin-top: 14px; padding: 10px 14px;
+  background: rgba(168, 69, 26, 0.1);
+  border-left: 2px solid var(--ember-glow);
+  font-size: 13px;
+  font-style: italic;
+}
+.popup-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 18px;
+}
+.popup-actions button {
+  font-family: 'Cinzel', serif; font-size: 11px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 2px; cursor: pointer;
+  border: 1px solid var(--ink-dim);
+  background: transparent;
+  color: var(--ink);
+}
+.popup-actions button.primary {
+  background: var(--ember-deep); border-color: var(--ember-deep); color: #f4ead0;
+}
+.popup-actions button.primary:hover { background: var(--ember-bright); }
+.popup-actions button:hover { background: var(--link-bg-hover); }
+
+/* ---------- status / error ---------- */
+.status {
+  padding: 12px 16px;
+  background: rgba(232, 196, 121, 0.15);
+  border-left: 3px solid var(--hud-warn);
+  font-size: 14px; font-style: italic;
+  border-radius: 2px;
+}
+.status.error { background: rgba(232, 145, 109, 0.15); border-color: var(--hud-danger); }
+
+.empty { color: var(--ink-dim); font-style: italic; }
 </style>
 </head>
 <body>
 <div class="app">
-  <main class="story-side">
-    <header class="story-header">
-      <div class="title-block">
-        <div class="eyebrow">An adaptive narrative · Local server</div>
-        <h1>The Ember Crown</h1>
-      </div>
-      <div class="act-indicator">
-        <div class="act-label" id="actLabel">Beat —</div>
-        <div class="act-sub" id="actSub">Loading</div>
-      </div>
-    </header>
-    <div id="stage"></div>
-  </main>
-  <aside class="side">
-    <div class="side-header">
-      <div class="side-eyebrow" id="pulse">// Narrative Director</div>
-      <div class="side-title">Session</div>
-      <div class="side-status" id="status">Connecting</div>
-      <div class="health-row">
-        <span class="health-dot" id="healthDot"></span>
-        <span id="healthText">checking server...</span>
-      </div>
-    </div>
-    <div class="objective">
-      <span class="side-label">Structural Objective</span>
-      <div>King Aldric dies. An era ends. The player is the catalyst — directly, indirectly, or through their absence.</div>
-    </div>
-    <div class="side-section">
-      <span class="side-label">Game ID</span>
-      <div class="side-content bright" id="gameIdDisplay" style="word-break: break-all;"></div>
-    </div>
-    <div class="dev-banner">// Developer Tracking</div>
-    <div class="side-section">
-      <span class="side-label">World</span>
-      <div id="worldBlock" class="side-content"><span class="empty-hint">— awaiting first beat —</span></div>
-    </div>
-    <div class="side-section">
-      <span class="side-label">Player</span>
-      <div id="playerBlock" class="side-content"><span class="empty-hint">— awaiting first beat —</span></div>
-    </div>
-    <div class="side-section">
-      <span class="side-label">NPCs</span>
-      <div id="npcBlock" class="side-content"><span class="empty-hint">— awaiting first beat —</span></div>
-    </div>
-    <div class="side-section">
-      <span class="side-label">Major Events</span>
-      <div id="eventBlock" class="side-content"><span class="empty-hint">— none yet —</span></div>
-    </div>
-    <div class="side-section">
-      <span class="side-label">Choice Log</span>
-      <div id="log" class="side-content">— no choices yet —</div>
-    </div>
-    <div class="side-section">
-      <button class="restart" id="resetBtn" style="width: 100%; padding: 10px;">Reset Game</button>
-    </div>
-  </aside>
+  <div class="title-row">
+    <h1>The Ember Crown</h1>
+    <span class="subtitle">A king dies. An era ends.</span>
+  </div>
+
+  <div id="hud" class="hud" hidden></div>
+
+  <div id="main" class="prose-area"></div>
+
+  <div id="status" class="status" hidden></div>
 </div>
 
 <script>
-// ============================================================
-// CONFIG
-// ============================================================
-const SERVER_URL = 'http://localhost:3000';
-const GAME_ID = 'ember-' + Math.random().toString(36).slice(2, 10);
+const SERVER = 'http://127.0.0.1:3000';
+const STORAGE_KEY = 'ember-crown-game-id';
 
-// ============================================================
-// STATE
-// ============================================================
-let state = {
-  beatNumber: 0,
-  prose: '',
-  choices: [],
+// ---------- API ----------
+
+async function api(path, init) {
+  const res = await fetch(SERVER + path, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
+// ---------- state ----------
+
+const game = {
+  gameId: null,
+  beatNumber: 1,
+  isOpening: true,
+  currentProse: null,
+  currentLinkContents: {},
+  currentChoices: [],
+  resolutionProse: null,
+  resolutionLinkContents: {},
+  beatTitle: null,
+  publicState: null,
+  terminalState: null,
   isEnding: false,
-  isLoading: false,
-  errorState: null,
-  lastChoice: null,
-  log: []
+  openedLinks: new Set()
 };
 
-// ============================================================
-// DOM
-// ============================================================
-const stage = document.getElementById('stage');
-const actLabel = document.getElementById('actLabel');
-const actSub = document.getElementById('actSub');
-const pulse = document.getElementById('pulse');
-const statusEl = document.getElementById('status');
-const healthDot = document.getElementById('healthDot');
-const healthText = document.getElementById('healthText');
-const gameIdDisplay = document.getElementById('gameIdDisplay');
-const logEl = document.getElementById('log');
-const resetBtn = document.getElementById('resetBtn');
-const worldBlock = document.getElementById('worldBlock');
-const playerBlock = document.getElementById('playerBlock');
-const npcBlock = document.getElementById('npcBlock');
-const eventBlock = document.getElementById('eventBlock');
+function persistGameId(id) {
+  if (id) localStorage.setItem(STORAGE_KEY, id);
+  else    localStorage.removeItem(STORAGE_KEY);
+}
+function loadGameId() { return localStorage.getItem(STORAGE_KEY); }
+function newGameId()  { return 'ember-' + Math.random().toString(36).slice(2, 9); }
 
-gameIdDisplay.textContent = GAME_ID;
+// ---------- /turn ----------
 
-// ============================================================
-// SERVER CALLS
-// ============================================================
-async function checkHealth() {
-  try {
-    const r = await fetch(SERVER_URL + '/health');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    healthDot.classList.add('ok');
-    healthDot.classList.remove('bad');
-    healthText.textContent = `${data.world} · ${data.model}`;
-    return true;
-  } catch (e) {
-    healthDot.classList.add('bad');
-    healthDot.classList.remove('ok');
-    healthText.textContent = 'server unreachable';
-    return false;
+async function startOrContinue() {
+  let gameId = loadGameId();
+  if (!gameId) {
+    gameId = newGameId();
+    persistGameId(gameId);
   }
+  game.gameId = gameId;
+  setStatus(null);
+  await postTurn(null);
 }
 
 async function postTurn(choice) {
-  const payload = { gameId: GAME_ID };
-  if (choice) payload.choice = choice;
-
-  let response;
+  setBusy(true);
+  setStatus(choice ? 'Sending choice...' : 'Loading the world...');
   try {
-    response = await fetch(SERVER_URL + '/turn', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch (netErr) {
-    throw new Error(`Cannot reach local server at ${SERVER_URL}.\nIs it running? (cd server && npm start)\n\nDetail: ${netErr.message}`);
-  }
-
-  const rawBody = await response.text();
-  if (!response.ok) {
-    throw new Error(`Server returned HTTP ${response.status}.\n\n${rawBody.substring(0, 800)}`);
-  }
-  try {
-    return JSON.parse(rawBody);
-  } catch (e) {
-    throw new Error(`Server response was not JSON.\n\n${rawBody.substring(0, 800)}`);
+    const body = { gameId: game.gameId };
+    if (choice) body.choice = choice;
+    const data = await api('/turn', { method: 'POST', body: JSON.stringify(body) });
+    handleTurnResponse(data);
+    setStatus(null);
+  } catch (err) {
+    if (String(err.message).includes('missing_choice_label')) {
+      // Existing game with no choice supplied — start fresh.
+      console.warn('Existing game on server but no choice provided; resetting.');
+      try { await api('/reset', { method: 'POST', body: JSON.stringify({ gameId: game.gameId }) }); } catch {}
+      await postTurn(null);
+      return;
+    }
+    setStatus('Cannot reach local server: ' + err.message, true);
+  } finally {
+    setBusy(false);
   }
 }
 
-// Stream a turn via SSE. Calls handlers as events arrive.
-//   onProse(text)   - append more prose chars to the live preview
-//   onProseReset()  - retry happened: discard everything streamed so far
-//   onFinal(data)   - the validated turn payload (same shape as /turn)
-//   onError(msg)    - server-emitted error string
-// Returns when the stream closes. Throws on network errors.
-async function streamTurn(choice, { onProse, onProseReset, onFinal, onError }) {
-  const payload = { gameId: GAME_ID };
-  if (choice) payload.choice = choice;
+function handleTurnResponse(data) {
+  game.beatNumber = data.beatNumber ?? game.beatNumber;
+  game.publicState = data.publicState ?? game.publicState;
+  game.isOpening = Boolean(data.isOpening);
+  game.isEnding = Boolean(data.isEnding);
+  game.terminalState = data.terminalState ?? null;
+  game.openedLinks = new Set();
 
-  let response;
-  try {
-    response = await fetch(SERVER_URL + '/turn/stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-      body: JSON.stringify(payload)
-    });
-  } catch (netErr) {
-    throw new Error(`Cannot reach local server at ${SERVER_URL}.\nIs it running? (cd server && npm start)\n\nDetail: ${netErr.message}`);
-  }
-  if (!response.ok || !response.body) {
-    const text = await response.text().catch(() => '');
-    throw new Error(`Server returned HTTP ${response.status}.\n\n${text.substring(0, 800)}`);
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder('utf-8');
-  let buf = '';
-
-  function dispatch(eventName, dataStr) {
-    let data;
-    try { data = JSON.parse(dataStr); } catch { data = dataStr; }
-    if (eventName === 'prose' && onProse && data && typeof data.text === 'string') onProse(data.text);
-    else if (eventName === 'prose-reset' && onProseReset) onProseReset();
-    else if (eventName === 'final' && onFinal) onFinal(data);
-    else if (eventName === 'error' && onError) onError(data && data.message ? data.message : String(data));
-  }
-
-  // Parse text/event-stream framing.
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx;
-    while ((idx = buf.indexOf('\n\n')) !== -1) {
-      const frame = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      let eventName = 'message';
-      const dataLines = [];
-      for (const line of frame.split('\n')) {
-        if (line.startsWith('event:')) eventName = line.slice(6).trim();
-        else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
-      }
-      if (dataLines.length > 0) dispatch(eventName, dataLines.join('\n'));
+  if (data.isOpening) {
+    game.currentProse = data.prose ?? { segments: [] };
+    game.currentLinkContents = data.linkContents ?? {};
+    game.currentChoices = data.choices ?? [];
+    game.resolutionProse = null;
+    game.resolutionLinkContents = {};
+    game.beatTitle = null;
+  } else {
+    game.resolutionProse = data.resolutionProse ?? null;
+    game.resolutionLinkContents = data.resolutionLinkContents ?? {};
+    if (data.nextBeat) {
+      game.currentProse = data.nextBeat.intro ?? { segments: [] };
+      game.currentLinkContents = data.nextBeat.introLinkContents ?? {};
+      game.currentChoices = data.nextBeat.choices ?? [];
+      game.beatTitle = data.nextBeat.title ?? null;
+    } else {
+      game.currentProse = null;
+      game.currentLinkContents = {};
+      game.currentChoices = [];
+      game.beatTitle = null;
     }
   }
+  render();
 }
 
-async function postReset() {
+// ---------- /investigate ----------
+
+async function postInvestigate(linkId) {
+  setBusy(true);
+  setStatus('Investigating...');
   try {
-    await fetch(SERVER_URL + '/reset', {
+    const data = await api('/investigate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gameId: GAME_ID })
+      body: JSON.stringify({
+        gameId: game.gameId,
+        beatNumber: game.beatNumber,
+        linkId
+      })
     });
-  } catch (e) { /* best effort */ }
-}
-
-// ============================================================
-// FLOW
-// ============================================================
-async function start() {
-  await checkHealth();
-  state.isLoading = true;
-  setLoadingUI(true);
-  try {
-    await runStreamingTurn(null, true);
+    if (data.publicState) game.publicState = data.publicState;
+    game.openedLinks.add(linkId);
+    setStatus(null);
+    return data;
   } catch (err) {
-    state.errorState = err.message;
-    renderError();
+    setStatus('Investigation failed: ' + err.message, true);
+    return null;
   } finally {
-    state.isLoading = false;
-    setLoadingUI(false);
+    setBusy(false);
   }
 }
 
-async function makeChoice(label, text) {
-  if (state.isLoading || state.isEnding) return;
-
-  state.isLoading = true;
-  state.errorState = null;
-  state.lastChoice = { label, text };
-  state.log.push({ beat: state.beatNumber, label, text });
-  renderLog();
-  setLoadingUI(true);
-
-  try {
-    await runStreamingTurn(label, false);
-  } catch (err) {
-    state.errorState = err.message;
-    state.log.pop();
-    renderLog();
-    renderError();
-  } finally {
-    state.isLoading = false;
-    setLoadingUI(false);
-  }
-}
-
-// Drive a streaming turn: prepare a live prose container, pipe deltas into it,
-// and apply the final validated payload when it arrives.
-async function runStreamingTurn(choice, isOpening) {
-  let liveProse = '';
-  beginStreamingRender(isOpening);
-  let finalData = null;
-  let serverError = null;
-
-  await streamTurn(choice, {
-    onProse: (text) => {
-      liveProse += text;
-      updateStreamingProse(liveProse);
-    },
-    onProseReset: () => {
-      liveProse = '';
-      updateStreamingProse(liveProse);
-    },
-    onFinal: (data) => { finalData = data; },
-    onError: (msg) => { serverError = msg || 'unknown server error'; }
-  });
-
-  if (serverError) throw new Error(serverError);
-  if (!finalData) throw new Error('Stream closed without a final payload.');
-  applyTurn(finalData, isOpening);
-}
-
-function beginStreamingRender(isOpening) {
-  const beatLabel = isOpening ? 'Opening' : `Beat ${state.beatNumber + 1 || '…'}`;
-  actLabel.textContent = beatLabel;
-  actSub.textContent = isOpening ? '— opening —' : '— composing —';
-  stage.innerHTML =
-    `<div class="fade-in">` +
-      `<div class="narrative ${isOpening ? 'first' : ''}" id="liveProse"></div>` +
-      `<div class="streaming-hint" style="opacity:.6;font-style:italic;margin-top:1em">…composing…</div>` +
-    `</div>`;
-}
-
-function updateStreamingProse(prose) {
-  const el = document.getElementById('liveProse');
-  if (!el) return;
-  el.innerHTML = proseToHtml(prose);
-}
-
-function applyTurn(data, isOpening) {
-  state.beatNumber = data.beatNumber;
-  state.prose = data.prose || '';
-  state.choices = Array.isArray(data.choices) ? data.choices : [];
-  state.isEnding = !!data.isEnding;
-
-  actLabel.textContent = state.isEnding ? 'Ending' : `Beat ${state.beatNumber}`;
-  actSub.textContent = state.isEnding ? '— era ends —' : (isOpening ? '— opening —' : '— in progress —');
-
-  if (data.publicState) renderPublicState(data.publicState);
-
-  if (state.isEnding) {
-    renderEnding();
-  } else {
-    renderBeat(isOpening);
-  }
-}
+// ---------- /reset ----------
 
 async function reset() {
-  await postReset();
-  state = {
-    beatNumber: 0,
-    prose: '',
-    choices: [],
-    isEnding: false,
-    isLoading: false,
-    errorState: null,
-    lastChoice: null,
-    log: []
-  };
-  renderLog();
-  start();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// ============================================================
-// RENDER
-// ============================================================
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function escapeAttr(s) {
-  return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-function proseToHtml(prose) {
-  const paragraphs = String(prose).split(/\n\n+/).map(p => p.trim()).filter(Boolean);
-  return paragraphs.map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`).join('');
-}
-
-function renderBeat(isOpening) {
-  const proseHtml = proseToHtml(state.prose);
-  let html = `<div class="fade-in">`;
-  html += `<div class="narrative ${isOpening ? 'first' : ''}">${proseHtml}</div>`;
-  if (state.choices.length > 0) {
-    html += `<div class="choices">`;
-    state.choices.forEach((c) => {
-      const so = typeof c.selfOther === 'number' ? c.selfOther : null;
-      const ay = typeof c.assertYield === 'number' ? c.assertYield : null;
-      let quadrant = 'coord';
-      let tagText = '';
-      if (so !== null && ay !== null) {
-        if (so < 0 && ay < 0) { quadrant = 'coord-claim';    tagText = 'CLAIM'; }
-        else if (so < 0 && ay > 0) { quadrant = 'coord-withdraw'; tagText = 'WITHDRAW'; }
-        else if (so > 0 && ay < 0) { quadrant = 'coord-champion'; tagText = 'CHAMPION'; }
-        else if (so > 0 && ay > 0) { quadrant = 'coord-witness';  tagText = 'WITNESS'; }
-        tagText += ` (${so.toFixed(1)}, ${ay.toFixed(1)})`;
-      } else {
-        tagText = 'choice';
-      }
-      html += `<button class="choice" data-label="${escapeAttr(c.label)}" data-text="${escapeAttr(c.text)}">
-        <span class="marker">${escapeHtml(c.label)}.</span>
-        <span class="text">${escapeHtml(c.text)}</span>
-        <span class="tag ${quadrant}">${escapeHtml(tagText)}</span>
-      </button>`;
-    });
-    html += `</div>`;
+  if (game.gameId) {
+    try { await api('/reset', { method: 'POST', body: JSON.stringify({ gameId: game.gameId }) }); } catch {}
   }
-  html += `</div>`;
-  stage.innerHTML = html;
-
-  document.querySelectorAll('.choice').forEach(btn => {
-    btn.addEventListener('click', () => {
-      makeChoice(btn.dataset.label, btn.dataset.text);
-    });
+  persistGameId(null);
+  Object.assign(game, {
+    gameId: null, beatNumber: 1, isOpening: true,
+    currentProse: null, currentLinkContents: {}, currentChoices: [],
+    resolutionProse: null, resolutionLinkContents: {}, beatTitle: null,
+    publicState: null, terminalState: null, isEnding: false,
+    openedLinks: new Set()
   });
+  await startOrContinue();
 }
 
-function renderEnding() {
-  const proseHtml = proseToHtml(state.prose);
-  let html = `<div class="fade-in">`;
-  html += `<div class="ending-card glow-in">`;
-  html += `<div class="ending-label">The era ends</div>`;
-  html += `<div class="ending-body">${proseHtml}</div>`;
-  html += `</div>`;
-  html += `<div class="restart-wrap"><button class="restart" id="restartBtn">Begin Again</button></div>`;
-  html += `</div>`;
-  stage.innerHTML = html;
-  document.getElementById('restartBtn').addEventListener('click', reset);
-}
+// ---------- rendering helpers ----------
 
-function renderError() {
-  let html = `<div class="fade-in">`;
-  if (state.prose) {
-    html += `<div class="narrative">${proseToHtml(state.prose)}</div>`;
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'className')      node.className = v;
+    else if (k === 'onclick')   node.addEventListener('click', v);
+    else if (k === 'dataset')   Object.assign(node.dataset, v);
+    else if (k === 'style')     node.setAttribute('style', v);
+    else if (k === 'hidden')    { if (v) node.hidden = true; }
+    else                        node.setAttribute(k, v);
   }
-  html += `<div class="error-box">`;
-  html += `<strong>Server Error</strong>`;
-  html += `Something went wrong. You can retry the last choice.<pre>${escapeHtml(state.errorState || '')}</pre>`;
-  if (state.lastChoice) {
-    html += `<button class="retry-btn" id="retryBtn">Retry Choice ${escapeHtml(state.lastChoice.label)}</button>`;
+  for (const c of children) {
+    if (c == null) continue;
+    if (typeof c === 'string') node.appendChild(document.createTextNode(c));
+    else                       node.appendChild(c);
+  }
+  return node;
+}
+
+function setStatus(text, isError = false) {
+  const s = document.getElementById('status');
+  if (!text) { s.hidden = true; s.textContent = ''; return; }
+  s.hidden = false;
+  s.textContent = text;
+  s.className = 'status' + (isError ? ' error' : '');
+}
+
+function setBusy(b) {
+  document.body.style.cursor = b ? 'progress' : '';
+  for (const btn of document.querySelectorAll('.choice-button')) btn.disabled = b;
+}
+
+function render() {
+  renderHud();
+  renderMain();
+}
+
+function qualitativeClock(h) {
+  if (h <= 0) return 'time has run out';
+  if (h <= 3) return 'a handful of hours';
+  if (h <= 6) return 'a single day, perhaps';
+  return 'less than half a day';
+}
+
+function renderHud() {
+  const hud = document.getElementById('hud');
+  hud.replaceChildren();
+  const ps = game.publicState;
+  if (!ps) { hud.hidden = true; return; }
+  hud.hidden = false;
+
+  // clock
+  const ch = ps.clockHours ?? 0;
+  let clockEl;
+  if (ch < 12) {
+    clockEl = el('span', { className: 'hud-clock-value qual danger' }, qualitativeClock(ch));
+  } else if (ch < 36) {
+    clockEl = el('span', { className: 'hud-clock-value warn' }, ch + 'h');
   } else {
-    html += `<button class="retry-btn" id="retryBtn">Retry</button>`;
+    clockEl = el('span', { className: 'hud-clock-value' }, ch + 'h');
   }
-  html += `</div></div>`;
-  stage.innerHTML = html;
-  document.getElementById('retryBtn').addEventListener('click', () => {
-    if (state.lastChoice) {
-      makeChoice(state.lastChoice.label, state.lastChoice.text);
-    } else {
-      start();
+  hud.appendChild(el('div', { className: 'hud-clock' },
+    el('span', { className: 'hud-label' }, 'Hours remaining'),
+    clockEl
+  ));
+
+  // condition
+  if (ps.condition) {
+    hud.appendChild(el('div', { className: 'hud-condition' },
+      el('span', { className: 'hud-label' }, 'You are '),
+      el('span', { className: 'chip ' + ps.condition }, ps.condition)
+    ));
+  }
+
+  // known threats — only those visible in HUD; cap 2; rest collapse
+  const visible = (ps.knownThreats || []).filter(t => t.isVisibleInHud);
+  if (visible.length > 0) {
+    const threats = el('div', { className: 'hud-threats' });
+    const shown = visible.slice(0, 2);
+    for (const t of shown) {
+      const phase = (t.currentPhase || '').toLowerCase();
+      const cls = 'threat-chip' + (phase === 'imminent' ? ' imminent' : '');
+      threats.appendChild(el('div', { className: cls },
+        el('span', { className: 'name' }, t.displayName),
+        el('span', { className: 'phase' }, t.currentPhase || '')
+      ));
     }
+    if (visible.length > 2) {
+      threats.appendChild(el('div', {
+        className: 'threat-chip',
+        title: visible.slice(2).map(t => t.displayName).join(', ')
+      },
+        el('span', { className: 'name' }, '...'),
+        el('span', { className: 'phase' }, '+' + (visible.length - 2) + ' more')
+      ));
+    }
+    hud.appendChild(threats);
+  }
+
+  hud.appendChild(el('div', { className: 'hud-actions' },
+    el('button', {
+      onclick: () => { if (confirm('Begin again? Your run will be lost.')) reset(); }
+    }, 'Reset')
+  ));
+}
+
+function renderMain() {
+  const main = document.getElementById('main');
+  main.replaceChildren();
+
+  if (game.isEnding && game.terminalState) {
+    main.appendChild(renderTerminal());
+    return;
+  }
+
+  // Resolution prose (if any) — what just happened from the player's last choice
+  if (game.resolutionProse) {
+    const block = el('div', { className: 'prose-block' });
+    block.appendChild(el('div', { className: 'resolution-label' }, '— Resolution —'));
+    block.appendChild(renderSegments(game.resolutionProse, game.resolutionLinkContents));
+    main.appendChild(block);
+    main.appendChild(el('div', { className: 'prose-divider' }));
+  }
+
+  // Beat title (intro)
+  if (game.beatTitle) {
+    main.appendChild(el('div', { className: 'beat-title' }, game.beatTitle));
+  }
+
+  // Current beat prose (intro of next beat, or opening prose)
+  if (game.currentProse) {
+    const block = el('div', { className: 'prose-block' });
+    block.appendChild(renderSegments(game.currentProse, game.currentLinkContents));
+    main.appendChild(block);
+  }
+
+  // Choices
+  if (game.currentChoices && game.currentChoices.length > 0) {
+    const choices = el('div', { className: 'choices' });
+    for (const c of game.currentChoices) {
+      choices.appendChild(el('button', {
+        className: 'choice-button',
+        onclick: () => postTurn(c.label)
+      },
+        el('span', { className: 'label' }, c.label),
+        c.text
+      ));
+    }
+    main.appendChild(choices);
+  }
+}
+
+function renderSegments(prose, linkContents) {
+  const wrap = el('div');
+  let currentP = el('p');
+  for (const seg of (prose?.segments || [])) {
+    if (seg.type === 'text') {
+      const parts = (seg.content || '').split(/\n\n+/);
+      for (let i = 0; i < parts.length; i++) {
+        if (i > 0) {
+          wrap.appendChild(currentP);
+          currentP = el('p');
+        }
+        if (parts[i]) currentP.appendChild(document.createTextNode(parts[i]));
+      }
+    } else if (seg.type === 'link') {
+      const id = seg.id;
+      const a = el('a', {
+        className: 'hyperlink' + (game.openedLinks.has(id) ? ' read' : ''),
+        href: 'javascript:void(0)',
+        dataset: { linkId: id }
+      }, seg.content || '');
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        showLinkPopup(id, linkContents);
+      });
+      currentP.appendChild(a);
+    }
+  }
+  wrap.appendChild(currentP);
+  return wrap;
+}
+
+function renderTerminal() {
+  const ts = game.terminalState;
+  const wrap = el('div', { className: 'terminal' });
+  wrap.appendChild(el('h2', {}, terminalTitle(ts.kind)));
+  if (game.resolutionProse) {
+    const block = el('div', {
+      className: 'prose-block',
+      style: 'text-align: left; max-width: 580px; margin: 0 auto;'
+    });
+    block.appendChild(renderSegments(game.resolutionProse, game.resolutionLinkContents));
+    wrap.appendChild(block);
+  }
+  if (ts.summary) {
+    wrap.appendChild(el('p', {
+      className: 'terminal-summary',
+      style: 'margin-top: 14px;'
+    }, ts.summary));
+  }
+  wrap.appendChild(el('div', { className: 'terminal-actions' },
+    el('button', { onclick: reset }, 'Begin Again')
+  ));
+  return wrap;
+}
+
+function terminalTitle(kind) {
+  switch (kind) {
+    case 'reached-king': return 'You Reach the King';
+    case 'time-up':      return 'The Bells Toll';
+    case 'killed':       return 'You Fall';
+    case 'trapped':      return 'You Are Taken';
+    case 'jailed':       return 'You Are Caged';
+    default:             return 'The Era Ends';
+  }
+}
+
+// ---------- link popup ----------
+
+let popupOpen = false;
+let escListener = null;
+
+function showLinkPopup(linkId, linkContents) {
+  if (popupOpen) return;
+  const link = (linkContents || {})[linkId];
+  if (!link) {
+    console.warn('No linkContents entry for', linkId);
+    return;
+  }
+
+  const alreadyOpened = game.openedLinks.has(linkId);
+  const cost = Number(link.costHours) || 0;
+
+  if (cost > 0 && !alreadyOpened) {
+    showCostConfirm(linkId, link);
+    return;
+  }
+  // Free link OR already opened: show content, fire-and-forget /investigate on first click
+  if (!alreadyOpened) postInvestigate(linkId);
+  showPopupContent(link.content);
+}
+
+function showCostConfirm(linkId, link) {
+  popupOpen = true;
+  const cost = Number(link.costHours) || 0;
+  const bg = el('div', { className: 'popup-bg' });
+  const popup = el('div', { className: 'popup' });
+  popup.appendChild(el('div', { className: 'popup-title' }, 'Investigate?'));
+  popup.appendChild(el('div', { className: 'popup-body' },
+    el('p', {}, 'This will take time you may not have to spare.')
+  ));
+  popup.appendChild(el('div', { className: 'popup-cost' },
+    'Cost: about ' + cost + ' hour' + (cost === 1 ? '' : 's') + '.'
+  ));
+  popup.appendChild(el('div', { className: 'popup-actions' },
+    el('button', { onclick: () => closePopup(bg) }, 'Step away'),
+    el('button', { className: 'primary', onclick: async () => {
+      closePopup(bg);
+      const data = await postInvestigate(linkId);
+      if (data && data.ok) showPopupContent(link.content);
+    } }, 'Look closer')
+  ));
+  bg.appendChild(popup);
+  bg.addEventListener('click', (ev) => { if (ev.target === bg) closePopup(bg); });
+  attachEsc(bg);
+  document.body.appendChild(bg);
+}
+
+function showPopupContent(content) {
+  popupOpen = true;
+  const bg = el('div', { className: 'popup-bg' });
+  const popup = el('div', { className: 'popup' });
+  popup.appendChild(el('div', { className: 'popup-title' }, 'In the margin'));
+  popup.appendChild(el('div', { className: 'popup-body' },
+    el('p', {}, content)
+  ));
+  popup.appendChild(el('div', { className: 'popup-actions' },
+    el('button', { className: 'primary', onclick: () => closePopup(bg) }, 'Close')
+  ));
+  bg.appendChild(popup);
+  bg.addEventListener('click', (ev) => { if (ev.target === bg) closePopup(bg); });
+  attachEsc(bg);
+  document.body.appendChild(bg);
+  // Re-render so the link picks up its "read" styling
+  render();
+}
+
+function attachEsc(bg) {
+  if (escListener) document.removeEventListener('keydown', escListener);
+  escListener = (e) => { if (e.key === 'Escape') closePopup(bg); };
+  document.addEventListener('keydown', escListener);
+}
+
+function closePopup(bg) {
+  popupOpen = false;
+  if (escListener) { document.removeEventListener('keydown', escListener); escListener = null; }
+  if (bg && bg.parentNode) bg.parentNode.removeChild(bg);
+}
+
+// ---------- boot ----------
+
+window.addEventListener('DOMContentLoaded', () => {
+  startOrContinue().catch(err => {
+    setStatus('Failed to start: ' + err.message, true);
   });
-}
-
-function kvRow(key, val) {
-  return `<div class="kv-row"><div class="kv-key">${escapeHtml(key)}</div><div class="kv-val">${escapeHtml(val)}</div></div>`;
-}
-
-function renderPublicState(ps) {
-  // World
-  const worldRows = [
-    kvRow('Day', ps.worldDay ?? '—'),
-    kvRow('Time', ps.timeOfDay ?? '—'),
-    kvRow('Hours', `~${ps.cumulativeHoursElapsed ?? 0}h elapsed`)
-  ].join('');
-  worldBlock.innerHTML = worldRows;
-
-  // Player
-  const player = ps.player || {};
-  const inv = Array.isArray(player.inventory) ? player.inventory : [];
-  const playerRows = [
-    kvRow('Location', player.location || '—'),
-    kvRow('Condition', player.condition || '—'),
-    kvRow('Inventory', inv.length ? inv.join(', ') : '(empty)')
-  ].join('');
-  playerBlock.innerHTML = playerRows;
-
-  // NPCs
-  const npcs = Array.isArray(ps.npcs) ? ps.npcs : [];
-  if (npcs.length === 0) {
-    npcBlock.innerHTML = `<span class="empty-hint">— none tracked —</span>`;
-  } else {
-    npcBlock.innerHTML = npcs.map(n => {
-      const role = n.role ? `<span class="npc-role">${escapeHtml(n.role)}</span>` : '';
-      const meta = `${escapeHtml(n.location || '—')} · ${escapeHtml(n.status || '—')}`;
-      return `<div class="npc-row">
-        <div><span class="npc-name">${escapeHtml(n.name || n.id)}</span>${role}</div>
-        <div class="npc-meta">${meta}</div>
-      </div>`;
-    }).join('');
-  }
-
-  // Events (most recent first)
-  const events = Array.isArray(ps.majorEvents) ? ps.majorEvents : [];
-  if (events.length === 0) {
-    eventBlock.innerHTML = `<span class="empty-hint">— none yet —</span>`;
-  } else {
-    eventBlock.innerHTML = events.slice().reverse().map(e =>
-      `<div class="event-row">${escapeHtml(e)}</div>`
-    ).join('');
-  }
-}
-
-function renderLog() {
-  if (state.log.length === 0) {
-    logEl.innerHTML = `<span style="opacity: 0.5;">— no choices yet —</span>`;
-  } else {
-    logEl.innerHTML = state.log.map(entry =>
-      `<div class="log-entry">
-        <span class="log-choice">${escapeHtml(entry.label)}</span>
-        <span class="log-text"><span class="log-beat">Beat ${entry.beat}</span>${escapeHtml(entry.text)}</span>
-      </div>`
-    ).join('');
-  }
-}
-
-function setLoadingUI(loading) {
-  if (loading) {
-    pulse.classList.add('thinking');
-    statusEl.classList.add('thinking');
-    statusEl.textContent = 'Composing...';
-    document.querySelectorAll('.choice').forEach(b => b.disabled = true);
-
-    const loadingHtml = `<div class="loading" id="loadingBox">
-      <div class="loading-text">Director Thinking</div>
-      <div>
-        <span class="loading-shimmer"></span>
-        <span class="loading-shimmer"></span>
-        <span class="loading-shimmer"></span>
-      </div>
-      <div class="loading-meta">Updating world state, planning the next beat...</div>
-    </div>`;
-    const inner = stage.querySelector('.fade-in') || stage;
-    inner.insertAdjacentHTML('beforeend', loadingHtml);
-  } else {
-    pulse.classList.remove('thinking');
-    statusEl.classList.remove('thinking');
-    statusEl.textContent = state.isEnding ? 'Story complete' : (state.beatNumber ? `Beat ${state.beatNumber} active` : 'Ready');
-    const lb = document.getElementById('loadingBox');
-    if (lb) lb.remove();
-  }
-}
-
-// ============================================================
-// INIT
-// ============================================================
-resetBtn.addEventListener('click', reset);
-renderLog();
-start();
+});
 </script>
 </body>
 </html>
