@@ -20,6 +20,7 @@
     "threats",
     "scheduledEvents",
     "pendingRevelations",
+    "openedLinks",
     "playerKnowledge",
     "npcStates",
     "runHistory",
@@ -78,6 +79,16 @@
           "strength":      { "$ref": "#/$defs/revelationStrength" },
           "content":       { "type": "string" }
         }
+      }
+    },
+
+    "openedLinks": {
+      "type": "object",
+      "description": "Tracks which hyperlinks the player has opened, keyed by beatNumber as string. Values are arrays of linkIds. Used for first-click-only idempotency in the /investigate flow.",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" },
+        "uniqueItems": true
       }
     },
 
